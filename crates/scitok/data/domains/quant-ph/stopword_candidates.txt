@@ -1,0 +1,13 @@
+# Words in a large share of documents (document frequency ratio).
+# Not loaded: copy real boilerplate into stopwords.txt after review.
+quantum	0.884
+state	0.557
+result	0.420
+two	0.392
+system	0.388
+qubit	0.309
+time	0.296
+classical	0.290
+model	0.290
+one	0.262
+framework	0.258

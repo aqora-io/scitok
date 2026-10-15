@@ -1,0 +1,1490 @@
+# Curated quant-ph lexicon. Hand-maintained; always wins over mined.toml.
+#
+# Matching ignores case (unless case_sensitive), plurals, possessives and
+# hyphen/space differences, so list only genuinely different spellings.
+# case_sensitive = true applies to acronym variants only (ETH vs. "eth").
+# Changing this file changes term ids: re-index collections afterwards.
+version = 1
+
+# --- Algorithms ------------------------------------------------------------
+
+[[term]]
+canonical = "shor_algorithm"
+variants = ["Shor's algorithm", "Shor algorithm", "Shor's factoring algorithm", "quantum factoring algorithm"]
+
+[[term]]
+canonical = "grover_algorithm"
+variants = ["Grover's algorithm", "Grover algorithm", "Grover search", "Grover's search", "Grover's search algorithm"]
+
+[[term]]
+canonical = "deutsch_jozsa_algorithm"
+variants = ["Deutsch-Jozsa algorithm", "Deutsch-Jozsa problem"]
+
+[[term]]
+canonical = "bernstein_vazirani_algorithm"
+variants = ["Bernstein-Vazirani algorithm", "Bernstein-Vazirani problem"]
+
+[[term]]
+canonical = "simon_algorithm"
+variants = ["Simon's algorithm", "Simon's problem"]
+
+[[term]]
+canonical = "qpe"
+variants = ["QPE", "quantum phase estimation", "phase estimation algorithm"]
+
+[[term]]
+canonical = "iterative_phase_estimation"
+variants = ["iterative phase estimation", "IPE algorithm"]
+
+[[term]]
+canonical = "hhl"
+variants = ["HHL", "HHL algorithm", "Harrow-Hassidim-Lloyd algorithm", "quantum linear systems algorithm", "quantum linear system solver"]
+
+[[term]]
+canonical = "qft"
+variants = ["quantum Fourier transform", "quantum Fourier transformation"]
+
+[[term]]
+canonical = "amplitude_amplification"
+variants = ["amplitude amplification", "oblivious amplitude amplification"]
+
+[[term]]
+canonical = "qae"
+variants = ["QAE", "quantum amplitude estimation", "amplitude estimation"]
+
+[[term]]
+canonical = "quantum_walk"
+variants = ["quantum walk", "quantum random walk"]
+
+[[term]]
+canonical = "ctqw"
+variants = ["CTQW", "continuous-time quantum walk"]
+
+[[term]]
+canonical = "dtqw"
+variants = ["DTQW", "discrete-time quantum walk"]
+
+[[term]]
+canonical = "lcu"
+variants = ["LCU", "linear combination of unitaries"]
+
+[[term]]
+canonical = "qsvt"
+variants = ["QSVT", "quantum singular value transformation", "quantum singular value transform"]
+
+[[term]]
+canonical = "qsp"
+variants = ["QSP", "quantum signal processing"]
+
+[[term]]
+canonical = "qubitization"
+variants = ["qubitization", "qubitisation"]
+
+[[term]]
+canonical = "block_encoding"
+variants = ["block encoding", "block-encoding"]
+
+[[term]]
+canonical = "hamiltonian_simulation"
+variants = ["Hamiltonian simulation"]
+
+[[term]]
+canonical = "trotterization"
+variants = ["Trotterization", "Trotterisation", "Trotter decomposition", "Trotter-Suzuki decomposition", "Suzuki-Trotter decomposition", "Trotter formula", "Trotter-Suzuki formula"]
+
+[[term]]
+canonical = "product_formula"
+variants = ["product formula", "product formulas"]
+
+[[term]]
+canonical = "qdrift"
+variants = ["qDRIFT"]
+
+[[term]]
+canonical = "vqe"
+variants = ["VQE", "variational quantum eigensolver"]
+
+[[term]]
+canonical = "adapt_vqe"
+variants = ["ADAPT-VQE"]
+
+[[term]]
+canonical = "vqa"
+variants = ["VQA", "variational quantum algorithm"]
+
+[[term]]
+canonical = "qaoa"
+variants = ["QAOA", "quantum approximate optimization algorithm", "quantum approximate optimisation algorithm", "quantum alternating operator ansatz"]
+
+[[term]]
+canonical = "qite"
+variants = ["QITE", "quantum imaginary time evolution"]
+
+[[term]]
+canonical = "ucc"
+variants = ["UCC", "unitary coupled cluster", "unitary coupled-cluster"]
+
+[[term]]
+canonical = "uccsd"
+variants = ["UCCSD", "unitary coupled cluster singles and doubles"]
+
+[[term]]
+canonical = "hardware_efficient_ansatz"
+variants = ["hardware-efficient ansatz", "hardware efficient ansatz", "HEA"]
+
+[[term]]
+canonical = "parameter_shift_rule"
+variants = ["parameter-shift rule", "parameter shift rule"]
+
+[[term]]
+canonical = "barren_plateau"
+variants = ["barren plateau"]
+
+[[term]]
+canonical = "quantum_annealing"
+variants = ["quantum annealing", "quantum annealer"]
+
+[[term]]
+canonical = "aqc"
+variants = ["AQC", "adiabatic quantum computation", "adiabatic quantum computing", "adiabatic quantum optimization"]
+
+[[term]]
+canonical = "qubo"
+variants = ["QUBO", "quadratic unconstrained binary optimization", "quadratic unconstrained binary optimisation"]
+
+[[term]]
+canonical = "qml"
+variants = ["QML", "quantum machine learning"]
+
+[[term]]
+canonical = "qnn"
+variants = ["QNN", "quantum neural network"]
+
+[[term]]
+canonical = "qcnn"
+variants = ["QCNN", "quantum convolutional neural network"]
+
+[[term]]
+canonical = "quantum_kernel"
+variants = ["quantum kernel", "quantum kernel method"]
+
+[[term]]
+canonical = "quantum_boltzmann_machine"
+variants = ["quantum Boltzmann machine"]
+
+[[term]]
+canonical = "quantum_reservoir_computing"
+variants = ["quantum reservoir computing"]
+
+[[term]]
+canonical = "quantum_extreme_learning_machine"
+variants = ["quantum extreme learning machine"]
+
+[[term]]
+canonical = "dequantization"
+variants = ["dequantization", "dequantisation", "dequantized algorithm"]
+
+# --- Benchmarking, characterization and mitigation -------------------------
+
+[[term]]
+canonical = "randomized_benchmarking"
+variants = ["RB", "randomized benchmarking", "randomised benchmarking"]
+case_sensitive = true
+
+[[term]]
+canonical = "interleaved_randomized_benchmarking"
+variants = ["interleaved randomized benchmarking", "interleaved RB"]
+
+[[term]]
+canonical = "xeb"
+variants = ["XEB", "cross-entropy benchmarking", "linear cross-entropy benchmarking", "linear XEB"]
+
+[[term]]
+canonical = "quantum_volume"
+variants = ["quantum volume"]
+
+[[term]]
+canonical = "gate_set_tomography"
+variants = ["GST", "gate set tomography"]
+
+[[term]]
+canonical = "quantum_state_tomography"
+variants = ["quantum state tomography", "state tomography"]
+
+[[term]]
+canonical = "quantum_process_tomography"
+variants = ["quantum process tomography", "process tomography"]
+
+[[term]]
+canonical = "classical_shadow"
+variants = ["classical shadow", "classical shadows", "shadow tomography"]
+
+[[term]]
+canonical = "zne"
+variants = ["ZNE", "zero-noise extrapolation", "zero noise extrapolation"]
+
+[[term]]
+canonical = "pec"
+variants = ["PEC", "probabilistic error cancellation"]
+
+[[term]]
+canonical = "quantum_error_mitigation"
+variants = ["QEM", "quantum error mitigation", "error mitigation"]
+
+[[term]]
+canonical = "dynamical_decoupling"
+variants = ["dynamical decoupling"]
+
+[[term]]
+canonical = "randomized_compiling"
+variants = ["randomized compiling", "randomised compiling"]
+
+[[term]]
+canonical = "pauli_twirling"
+variants = ["Pauli twirling"]
+
+[[term]]
+canonical = "spam_error"
+variants = ["SPAM", "SPAM error", "state preparation and measurement error", "state preparation and measurement errors"]
+case_sensitive = true
+
+# --- Error correction ------------------------------------------------------
+
+[[term]]
+canonical = "qec"
+variants = ["QEC", "quantum error correction", "quantum error-correction"]
+
+[[term]]
+canonical = "qecc"
+variants = ["QECC", "quantum error-correcting code", "quantum error correcting code", "quantum error correction code"]
+
+[[term]]
+canonical = "surface_code"
+variants = ["surface code", "planar code"]
+
+[[term]]
+canonical = "rotated_surface_code"
+variants = ["rotated surface code"]
+
+[[term]]
+canonical = "toric_code"
+variants = ["toric code", "Kitaev's toric code", "Kitaev toric code"]
+
+[[term]]
+canonical = "color_code"
+variants = ["color code", "colour code"]
+
+[[term]]
+canonical = "bacon_shor_code"
+variants = ["Bacon-Shor code"]
+
+[[term]]
+canonical = "shor_code"
+variants = ["Shor code", "Shor's code", "nine-qubit code", "9-qubit code"]
+
+[[term]]
+canonical = "steane_code"
+variants = ["Steane code", "seven-qubit code", "7-qubit code"]
+
+[[term]]
+canonical = "five_qubit_code"
+variants = ["five-qubit code", "5-qubit code"]
+
+[[term]]
+canonical = "repetition_code"
+variants = ["repetition code"]
+
+[[term]]
+canonical = "css_code"
+variants = ["CSS code", "Calderbank-Shor-Steane code"]
+
+[[term]]
+canonical = "stabilizer_code"
+variants = ["stabilizer code"]
+
+[[term]]
+canonical = "stabilizer_formalism"
+variants = ["stabilizer formalism"]
+
+[[term]]
+canonical = "subsystem_code"
+variants = ["subsystem code"]
+
+[[term]]
+canonical = "floquet_code"
+variants = ["Floquet code", "dynamical code"]
+
+[[term]]
+canonical = "honeycomb_code"
+variants = ["honeycomb code"]
+
+[[term]]
+canonical = "qldpc_code"
+variants = ["qLDPC", "qLDPC code", "quantum LDPC code", "quantum low-density parity-check code", "QLDPC code"]
+
+[[term]]
+canonical = "ldpc_code"
+variants = ["LDPC code", "low-density parity-check code"]
+
+[[term]]
+canonical = "bivariate_bicycle_code"
+variants = ["bivariate bicycle code", "BB code"]
+
+[[term]]
+canonical = "hypergraph_product_code"
+variants = ["hypergraph product code"]
+
+[[term]]
+canonical = "quantum_tanner_code"
+variants = ["quantum Tanner code"]
+
+[[term]]
+canonical = "concatenated_code"
+variants = ["concatenated code", "code concatenation"]
+
+[[term]]
+canonical = "gkp_code"
+variants = ["GKP", "GKP code", "Gottesman-Kitaev-Preskill code", "GKP state", "GKP qubit"]
+
+[[term]]
+canonical = "bosonic_code"
+variants = ["bosonic code"]
+
+[[term]]
+canonical = "binomial_code"
+variants = ["binomial code"]
+
+[[term]]
+canonical = "cat_code"
+variants = ["cat code"]
+
+[[term]]
+canonical = "logical_qubit"
+variants = ["logical qubit"]
+
+[[term]]
+canonical = "code_distance"
+variants = ["code distance"]
+
+[[term]]
+canonical = "ftqc"
+variants = ["FTQC", "fault-tolerant quantum computation", "fault-tolerant quantum computing", "fault tolerant quantum computation", "fault-tolerant quantum computer"]
+
+[[term]]
+canonical = "fault_tolerance"
+variants = ["fault tolerance", "fault-tolerance"]
+
+[[term]]
+canonical = "threshold_theorem"
+variants = ["threshold theorem", "quantum threshold theorem", "accuracy threshold theorem"]
+
+[[term]]
+canonical = "error_threshold"
+variants = ["error threshold", "fault-tolerance threshold", "fault tolerance threshold", "threshold error rate"]
+
+[[term]]
+canonical = "transversal_gate"
+variants = ["transversal gate"]
+
+[[term]]
+canonical = "magic_state"
+variants = ["magic state"]
+
+[[term]]
+canonical = "magic_state_distillation"
+variants = ["magic state distillation", "magic-state distillation"]
+
+[[term]]
+canonical = "magic_state_injection"
+variants = ["magic state injection"]
+
+[[term]]
+canonical = "lattice_surgery"
+variants = ["lattice surgery"]
+
+[[term]]
+canonical = "syndrome_measurement"
+variants = ["syndrome measurement", "syndrome extraction"]
+
+[[term]]
+canonical = "mwpm"
+variants = ["MWPM", "minimum-weight perfect matching", "minimum weight perfect matching"]
+
+[[term]]
+canonical = "union_find_decoder"
+variants = ["union-find decoder", "union find decoder"]
+
+[[term]]
+canonical = "belief_propagation"
+variants = ["belief propagation"]
+
+[[term]]
+canonical = "bp_osd"
+variants = ["BP-OSD", "BP+OSD"]
+
+[[term]]
+canonical = "erasure_qubit"
+variants = ["erasure qubit", "erasure conversion"]
+
+[[term]]
+canonical = "leakage_error"
+variants = ["leakage error"]
+
+# --- Theorems, bounds and principles ---------------------------------------
+
+[[term]]
+canonical = "no_cloning_theorem"
+variants = ["no-cloning theorem", "no cloning theorem", "no-cloning"]
+
+[[term]]
+canonical = "no_deleting_theorem"
+variants = ["no-deleting theorem"]
+
+[[term]]
+canonical = "no_signaling"
+variants = ["no-signaling", "no-signalling", "no-signaling principle", "no-signalling principle"]
+
+[[term]]
+canonical = "gleason_theorem"
+variants = ["Gleason's theorem", "Gleason theorem"]
+
+[[term]]
+canonical = "kochen_specker_theorem"
+variants = ["Kochen-Specker theorem", "Kochen-Specker contextuality", "KS theorem"]
+
+[[term]]
+canonical = "bell_theorem"
+variants = ["Bell's theorem", "Bell theorem"]
+
+[[term]]
+canonical = "bell_inequality"
+variants = ["Bell inequality", "Bell's inequality"]
+
+[[term]]
+canonical = "chsh_inequality"
+variants = ["CHSH", "CHSH inequality", "Clauser-Horne-Shimony-Holt inequality", "CHSH game"]
+
+[[term]]
+canonical = "bell_nonlocality"
+variants = ["Bell nonlocality", "Bell non-locality", "nonlocality", "non-locality", "quantum nonlocality"]
+
+[[term]]
+canonical = "epr_paradox"
+variants = ["EPR paradox", "Einstein-Podolsky-Rosen paradox"]
+
+[[term]]
+canonical = "epr_steering"
+variants = ["EPR steering", "Einstein-Podolsky-Rosen steering", "quantum steering"]
+
+[[term]]
+canonical = "holevo_bound"
+variants = ["Holevo bound", "Holevo quantity", "Holevo information", "Holevo's theorem"]
+
+[[term]]
+canonical = "lieb_robinson_bound"
+variants = ["Lieb-Robinson bound", "Lieb-Robinson velocity", "LR bound"]
+
+[[term]]
+canonical = "solovay_kitaev"
+variants = ["Solovay-Kitaev theorem", "Solovay-Kitaev algorithm"]
+
+[[term]]
+canonical = "gottesman_knill_theorem"
+variants = ["Gottesman-Knill theorem"]
+
+[[term]]
+canonical = "eastin_knill_theorem"
+variants = ["Eastin-Knill theorem"]
+
+[[term]]
+canonical = "margolus_levitin_bound"
+variants = ["Margolus-Levitin bound", "Margolus-Levitin theorem"]
+
+[[term]]
+canonical = "mandelstam_tamm_bound"
+variants = ["Mandelstam-Tamm bound", "Mandelstam-Tamm relation"]
+
+[[term]]
+canonical = "quantum_speed_limit"
+variants = ["quantum speed limit"]
+
+[[term]]
+canonical = "cramer_rao_bound"
+variants = ["Cramer-Rao bound", "quantum Cramer-Rao bound"]
+
+[[term]]
+canonical = "qfi"
+variants = ["QFI", "quantum Fisher information"]
+
+[[term]]
+canonical = "heisenberg_limit"
+variants = ["Heisenberg limit", "Heisenberg scaling"]
+
+[[term]]
+canonical = "standard_quantum_limit"
+variants = ["standard quantum limit", "shot-noise limit", "shot noise limit"]
+
+[[term]]
+canonical = "uncertainty_principle"
+variants = ["uncertainty principle", "Heisenberg uncertainty principle", "uncertainty relation"]
+
+[[term]]
+canonical = "entropic_uncertainty_relation"
+variants = ["entropic uncertainty relation"]
+
+[[term]]
+canonical = "adiabatic_theorem"
+variants = ["adiabatic theorem"]
+
+[[term]]
+canonical = "quantum_zeno_effect"
+variants = ["quantum Zeno effect", "Zeno effect"]
+
+[[term]]
+canonical = "anti_zeno_effect"
+variants = ["quantum anti-Zeno effect", "anti-Zeno effect"]
+
+[[term]]
+canonical = "born_rule"
+variants = ["Born rule", "Born's rule"]
+
+[[term]]
+canonical = "stinespring_dilation"
+variants = ["Stinespring dilation", "Stinespring representation", "Stinespring dilation theorem"]
+
+[[term]]
+canonical = "choi_jamiolkowski"
+variants = ["Choi-Jamiolkowski isomorphism", "Choi isomorphism", "Choi state", "Choi matrix"]
+
+[[term]]
+canonical = "kraus_representation"
+variants = ["Kraus representation", "Kraus operator", "Kraus decomposition"]
+
+[[term]]
+canonical = "lindblad_master_equation"
+variants = ["Lindblad master equation", "Lindblad equation", "GKSL equation", "GKSL master equation", "Gorini-Kossakowski-Sudarshan-Lindblad equation"]
+
+[[term]]
+canonical = "uhlmann_theorem"
+variants = ["Uhlmann's theorem", "Uhlmann theorem", "Uhlmann fidelity"]
+
+[[term]]
+canonical = "schmidt_decomposition"
+variants = ["Schmidt decomposition"]
+
+[[term]]
+canonical = "schmidt_rank"
+variants = ["Schmidt rank", "Schmidt number"]
+
+[[term]]
+canonical = "data_processing_inequality"
+variants = ["data processing inequality", "data-processing inequality"]
+
+[[term]]
+canonical = "strong_subadditivity"
+variants = ["strong subadditivity"]
+
+[[term]]
+canonical = "pinsker_inequality"
+variants = ["Pinsker's inequality", "Pinsker inequality"]
+
+[[term]]
+canonical = "fannes_inequality"
+variants = ["Fannes inequality", "Fannes-Audenaert inequality"]
+
+[[term]]
+canonical = "peres_horodecki_criterion"
+variants = ["Peres-Horodecki criterion", "PPT criterion", "positive partial transpose criterion"]
+
+[[term]]
+canonical = "ppt"
+variants = ["PPT", "positive partial transpose", "positive partial transposition"]
+
+[[term]]
+canonical = "petz_recovery_map"
+variants = ["Petz recovery map", "Petz map"]
+
+[[term]]
+canonical = "area_law"
+variants = ["area law", "entanglement area law"]
+
+[[term]]
+canonical = "volume_law"
+variants = ["volume law"]
+
+[[term]]
+canonical = "page_curve"
+variants = ["Page curve"]
+
+[[term]]
+canonical = "eth"
+variants = ["ETH", "eigenstate thermalization hypothesis", "eigenstate thermalisation hypothesis"]
+case_sensitive = true
+
+[[term]]
+canonical = "wick_theorem"
+variants = ["Wick's theorem", "Wick theorem"]
+
+[[term]]
+canonical = "bekenstein_bound"
+variants = ["Bekenstein bound"]
+
+[[term]]
+canonical = "quantum_pcp"
+variants = ["quantum PCP", "quantum PCP conjecture", "qPCP"]
+
+[[term]]
+canonical = "nlts"
+variants = ["NLTS", "NLTS theorem", "no low-energy trivial states"]
+
+# --- Transformations and representations -----------------------------------
+
+[[term]]
+canonical = "jordan_wigner"
+variants = ["Jordan-Wigner transformation", "Jordan-Wigner transform", "Jordan-Wigner mapping", "Jordan-Wigner encoding"]
+
+[[term]]
+canonical = "bravyi_kitaev"
+variants = ["Bravyi-Kitaev transformation", "Bravyi-Kitaev transform", "Bravyi-Kitaev encoding"]
+
+[[term]]
+canonical = "holstein_primakoff"
+variants = ["Holstein-Primakoff transformation", "Holstein-Primakoff representation"]
+
+[[term]]
+canonical = "bogoliubov_transformation"
+variants = ["Bogoliubov transformation"]
+
+[[term]]
+canonical = "schrieffer_wolff"
+variants = ["Schrieffer-Wolff transformation"]
+
+[[term]]
+canonical = "wigner_function"
+variants = ["Wigner function", "Wigner quasiprobability distribution"]
+
+[[term]]
+canonical = "wigner_negativity"
+variants = ["Wigner negativity"]
+
+[[term]]
+canonical = "bloch_sphere"
+variants = ["Bloch sphere", "Bloch vector"]
+
+[[term]]
+canonical = "berry_phase"
+variants = ["Berry phase", "geometric phase", "Pancharatnam-Berry phase"]
+
+[[term]]
+canonical = "aharonov_bohm_effect"
+variants = ["Aharonov-Bohm effect"]
+
+[[term]]
+canonical = "interaction_picture"
+variants = ["interaction picture"]
+
+[[term]]
+canonical = "rotating_wave_approximation"
+variants = ["RWA", "rotating-wave approximation", "rotating wave approximation"]
+
+[[term]]
+canonical = "born_markov_approximation"
+variants = ["Born-Markov approximation"]
+
+# --- Models ----------------------------------------------------------------
+
+[[term]]
+canonical = "hubbard_model"
+variants = ["Hubbard model"]
+
+[[term]]
+canonical = "fermi_hubbard_model"
+variants = ["Fermi-Hubbard model"]
+
+[[term]]
+canonical = "bose_hubbard_model"
+variants = ["Bose-Hubbard model"]
+
+[[term]]
+canonical = "heisenberg_model"
+variants = ["Heisenberg model", "Heisenberg chain", "Heisenberg spin chain"]
+
+[[term]]
+canonical = "xxz_model"
+variants = ["XXZ model", "XXZ chain", "XXZ spin chain"]
+
+[[term]]
+canonical = "xy_model"
+variants = ["XY model"]
+
+[[term]]
+canonical = "ising_model"
+variants = ["Ising model"]
+
+[[term]]
+canonical = "tfim"
+variants = ["TFIM", "transverse-field Ising model", "transverse field Ising model", "quantum Ising model"]
+
+[[term]]
+canonical = "kitaev_chain"
+variants = ["Kitaev chain"]
+
+[[term]]
+canonical = "kitaev_honeycomb_model"
+variants = ["Kitaev honeycomb model", "Kitaev model"]
+
+[[term]]
+canonical = "jaynes_cummings_model"
+variants = ["Jaynes-Cummings model", "JC model"]
+
+[[term]]
+canonical = "tavis_cummings_model"
+variants = ["Tavis-Cummings model"]
+
+[[term]]
+canonical = "rabi_model"
+variants = ["quantum Rabi model", "Rabi model"]
+
+[[term]]
+canonical = "dicke_model"
+variants = ["Dicke model"]
+
+[[term]]
+canonical = "spin_boson_model"
+variants = ["spin-boson model"]
+
+[[term]]
+canonical = "syk_model"
+variants = ["SYK", "SYK model", "Sachdev-Ye-Kitaev model"]
+
+[[term]]
+canonical = "haldane_model"
+variants = ["Haldane model"]
+
+[[term]]
+canonical = "aklt_model"
+variants = ["AKLT", "AKLT model", "AKLT state"]
+
+[[term]]
+canonical = "lmg_model"
+variants = ["LMG model", "Lipkin-Meshkov-Glick model"]
+
+[[term]]
+canonical = "pxp_model"
+variants = ["PXP model"]
+
+[[term]]
+canonical = "caldeira_leggett_model"
+variants = ["Caldeira-Leggett model"]
+
+# --- States ----------------------------------------------------------------
+
+[[term]]
+canonical = "bell_state"
+variants = ["Bell state", "EPR pair", "Bell pair"]
+
+[[term]]
+canonical = "ghz_state"
+variants = ["GHZ", "GHZ state", "Greenberger-Horne-Zeilinger state"]
+
+[[term]]
+canonical = "w_state"
+variants = ["W state"]
+
+[[term]]
+canonical = "noon_state"
+variants = ["NOON state"]
+
+[[term]]
+canonical = "cluster_state"
+variants = ["cluster state"]
+
+[[term]]
+canonical = "graph_state"
+variants = ["graph state"]
+
+[[term]]
+canonical = "squeezed_state"
+variants = ["squeezed state", "squeezed light", "squeezed vacuum"]
+
+[[term]]
+canonical = "coherent_state"
+variants = ["coherent state"]
+
+[[term]]
+canonical = "fock_state"
+variants = ["Fock state", "number state"]
+
+[[term]]
+canonical = "cat_state"
+variants = ["cat state", "Schrodinger cat state", "Schrodinger's cat state", "cat-state"]
+
+[[term]]
+canonical = "dicke_state"
+variants = ["Dicke state"]
+
+[[term]]
+canonical = "werner_state"
+variants = ["Werner state"]
+
+[[term]]
+canonical = "isotropic_state"
+variants = ["isotropic state"]
+
+[[term]]
+canonical = "thermal_state"
+variants = ["thermal state", "Gibbs state"]
+
+[[term]]
+canonical = "ground_state"
+variants = ["ground state"]
+
+[[term]]
+canonical = "mps"
+variants = ["MPS", "matrix product state"]
+
+[[term]]
+canonical = "mpo"
+variants = ["MPO", "matrix product operator"]
+
+[[term]]
+canonical = "peps"
+variants = ["PEPS", "projected entangled pair state", "projected entangled-pair state"]
+
+[[term]]
+canonical = "mera"
+variants = ["MERA", "multiscale entanglement renormalization ansatz"]
+
+[[term]]
+canonical = "ttn"
+variants = ["TTN", "tree tensor network"]
+
+[[term]]
+canonical = "tensor_network"
+variants = ["tensor network"]
+
+# --- Many-body physics -----------------------------------------------------
+
+[[term]]
+canonical = "dmrg"
+variants = ["DMRG", "density matrix renormalization group", "density-matrix renormalization group"]
+
+[[term]]
+canonical = "tebd"
+variants = ["TEBD", "time-evolving block decimation"]
+
+[[term]]
+canonical = "tdvp"
+variants = ["TDVP", "time-dependent variational principle"]
+
+[[term]]
+canonical = "qmc"
+variants = ["QMC", "quantum Monte Carlo"]
+
+[[term]]
+canonical = "sign_problem"
+variants = ["sign problem", "fermion sign problem"]
+
+[[term]]
+canonical = "mbl"
+variants = ["MBL", "many-body localization", "many-body localisation", "many-body localized"]
+
+[[term]]
+canonical = "quantum_many_body_scar"
+variants = ["quantum many-body scar", "many-body scar", "quantum scar"]
+
+[[term]]
+canonical = "otoc"
+variants = ["OTOC", "out-of-time-order correlator", "out-of-time-ordered correlator"]
+
+[[term]]
+canonical = "information_scrambling"
+variants = ["information scrambling", "quantum information scrambling", "scrambling"]
+
+[[term]]
+canonical = "krylov_complexity"
+variants = ["Krylov complexity", "spread complexity"]
+
+[[term]]
+canonical = "spectral_form_factor"
+variants = ["spectral form factor"]
+
+[[term]]
+canonical = "quantum_chaos"
+variants = ["quantum chaos"]
+
+[[term]]
+canonical = "quantum_phase_transition"
+variants = ["quantum phase transition"]
+
+[[term]]
+canonical = "topological_order"
+variants = ["topological order"]
+
+[[term]]
+canonical = "spt_phase"
+variants = ["SPT", "SPT phase", "symmetry-protected topological phase", "symmetry protected topological phase", "symmetry-protected topological order"]
+
+[[term]]
+canonical = "anyon"
+variants = ["anyon", "non-Abelian anyon", "non-abelian anyons"]
+
+[[term]]
+canonical = "majorana_zero_mode"
+variants = ["MZM", "Majorana zero mode", "Majorana fermion", "Majorana mode"]
+
+[[term]]
+canonical = "time_crystal"
+variants = ["time crystal", "discrete time crystal", "Floquet time crystal"]
+
+[[term]]
+canonical = "floquet_engineering"
+variants = ["Floquet engineering"]
+
+[[term]]
+canonical = "quantum_spin_liquid"
+variants = ["quantum spin liquid"]
+
+[[term]]
+canonical = "tqft"
+variants = ["TQFT", "topological quantum field theory"]
+
+# --- Quantum information ---------------------------------------------------
+
+[[term]]
+canonical = "entanglement_entropy"
+variants = ["entanglement entropy"]
+
+[[term]]
+canonical = "von_neumann_entropy"
+variants = ["von Neumann entropy"]
+
+[[term]]
+canonical = "renyi_entropy"
+variants = ["Renyi entropy", "Renyi entropies"]
+
+[[term]]
+canonical = "mutual_information"
+variants = ["mutual information", "quantum mutual information"]
+
+[[term]]
+canonical = "conditional_mutual_information"
+variants = ["conditional mutual information", "quantum conditional mutual information"]
+
+[[term]]
+canonical = "relative_entropy"
+variants = ["relative entropy", "quantum relative entropy", "Umegaki relative entropy"]
+
+[[term]]
+canonical = "quantum_discord"
+variants = ["quantum discord"]
+
+[[term]]
+canonical = "concurrence"
+variants = ["concurrence"]
+
+[[term]]
+canonical = "logarithmic_negativity"
+variants = ["logarithmic negativity", "log-negativity"]
+
+[[term]]
+canonical = "entanglement_of_formation"
+variants = ["entanglement of formation"]
+
+[[term]]
+canonical = "distillable_entanglement"
+variants = ["distillable entanglement"]
+
+[[term]]
+canonical = "entanglement_witness"
+variants = ["entanglement witness"]
+
+[[term]]
+canonical = "entanglement_distillation"
+variants = ["entanglement distillation", "entanglement purification"]
+
+[[term]]
+canonical = "entanglement_swapping"
+variants = ["entanglement swapping"]
+
+[[term]]
+canonical = "entanglement_monotone"
+variants = ["entanglement monotone"]
+
+[[term]]
+canonical = "contextuality"
+variants = ["contextuality", "quantum contextuality"]
+
+[[term]]
+canonical = "stabilizer_renyi_entropy"
+variants = ["stabilizer Renyi entropy", "stabilizer entropy"]
+
+[[term]]
+canonical = "nonstabilizerness"
+variants = ["nonstabilizerness", "non-stabilizerness", "magic resource"]
+
+[[term]]
+canonical = "resource_theory"
+variants = ["resource theory", "quantum resource theory"]
+
+[[term]]
+canonical = "density_matrix"
+variants = ["density matrix", "density operator"]
+
+[[term]]
+canonical = "reduced_density_matrix"
+variants = ["reduced density matrix", "RDM"]
+
+[[term]]
+canonical = "trace_distance"
+variants = ["trace distance"]
+
+[[term]]
+canonical = "diamond_norm"
+variants = ["diamond norm", "diamond distance"]
+
+[[term]]
+canonical = "quantum_channel"
+variants = ["quantum channel"]
+
+[[term]]
+canonical = "cptp_map"
+variants = ["CPTP", "CPTP map", "completely positive trace-preserving map", "completely positive and trace-preserving map", "quantum operation"]
+
+[[term]]
+canonical = "povm"
+variants = ["POVM", "positive operator-valued measure", "positive operator valued measure"]
+
+[[term]]
+canonical = "pvm"
+variants = ["projective measurement", "PVM"]
+
+[[term]]
+canonical = "weak_measurement"
+variants = ["weak measurement", "weak value"]
+
+[[term]]
+canonical = "decoherence_free_subspace"
+variants = ["decoherence-free subspace"]
+
+[[term]]
+canonical = "open_quantum_system"
+variants = ["open quantum system"]
+
+[[term]]
+canonical = "non_markovian"
+variants = ["non-Markovian", "non-Markovianity"]
+
+[[term]]
+canonical = "quantum_teleportation"
+variants = ["quantum teleportation", "teleportation protocol"]
+
+[[term]]
+canonical = "gate_teleportation"
+variants = ["gate teleportation"]
+
+[[term]]
+canonical = "superdense_coding"
+variants = ["superdense coding", "dense coding"]
+
+[[term]]
+canonical = "locc"
+variants = ["LOCC", "local operations and classical communication"]
+
+[[term]]
+canonical = "quantum_capacity"
+variants = ["quantum capacity"]
+
+[[term]]
+canonical = "channel_capacity"
+variants = ["channel capacity", "classical capacity"]
+
+# --- Computing and complexity ----------------------------------------------
+
+[[term]]
+canonical = "bqp"
+variants = ["BQP"]
+
+[[term]]
+canonical = "qma"
+variants = ["QMA"]
+
+[[term]]
+canonical = "bpp"
+variants = ["BPP"]
+
+[[term]]
+canonical = "postbqp"
+variants = ["PostBQP"]
+
+[[term]]
+canonical = "local_hamiltonian_problem"
+variants = ["local Hamiltonian problem", "k-local Hamiltonian problem"]
+
+[[term]]
+canonical = "quantum_advantage"
+variants = ["quantum advantage", "quantum supremacy", "quantum computational advantage"]
+
+[[term]]
+canonical = "quantum_speedup"
+variants = ["quantum speedup", "quantum speed-up"]
+
+[[term]]
+canonical = "nisq"
+variants = ["NISQ", "noisy intermediate-scale quantum", "noisy intermediate scale quantum"]
+
+[[term]]
+canonical = "qpu"
+variants = ["QPU", "quantum processing unit", "quantum processor"]
+
+[[term]]
+canonical = "qram"
+variants = ["QRAM", "quantum random access memory", "quantum random-access memory"]
+
+[[term]]
+canonical = "quantum_circuit"
+variants = ["quantum circuit"]
+
+[[term]]
+canonical = "circuit_depth"
+variants = ["circuit depth"]
+
+[[term]]
+canonical = "universal_gate_set"
+variants = ["universal gate set", "universal set of gates"]
+
+[[term]]
+canonical = "clifford_group"
+variants = ["Clifford group"]
+
+[[term]]
+canonical = "clifford_gate"
+variants = ["Clifford gate"]
+
+[[term]]
+canonical = "clifford_circuit"
+variants = ["Clifford circuit", "stabilizer circuit"]
+
+[[term]]
+canonical = "pauli_group"
+variants = ["Pauli group"]
+
+[[term]]
+canonical = "pauli_operator"
+variants = ["Pauli operator", "Pauli matrix", "Pauli matrices", "Pauli string"]
+
+[[term]]
+canonical = "cnot"
+variants = ["CNOT", "CNOT gate", "controlled-NOT", "controlled-NOT gate", "CX gate"]
+
+[[term]]
+canonical = "cz_gate"
+variants = ["CZ gate", "controlled-Z gate", "controlled-Z", "controlled phase gate"]
+
+[[term]]
+canonical = "iswap"
+variants = ["iSWAP", "iSWAP gate"]
+
+[[term]]
+canonical = "swap_gate"
+variants = ["SWAP gate"]
+
+[[term]]
+canonical = "swap_test"
+variants = ["SWAP test", "swap test"]
+
+[[term]]
+canonical = "toffoli_gate"
+variants = ["Toffoli gate", "CCNOT", "CCX"]
+
+[[term]]
+canonical = "hadamard_gate"
+variants = ["Hadamard gate"]
+
+[[term]]
+canonical = "t_gate"
+variants = ["T gate"]
+
+[[term]]
+canonical = "t_count"
+variants = ["T-count", "T count"]
+
+[[term]]
+canonical = "cliffordt"
+variants = ["Clifford+T", "Clifford + T"]
+
+[[term]]
+canonical = "mbqc"
+variants = ["MBQC", "measurement-based quantum computation", "measurement-based quantum computing", "one-way quantum computer", "one-way quantum computation"]
+
+[[term]]
+canonical = "blind_quantum_computation"
+variants = ["blind quantum computation", "blind quantum computing", "delegated quantum computation"]
+
+[[term]]
+canonical = "boson_sampling"
+variants = ["boson sampling"]
+
+[[term]]
+canonical = "gaussian_boson_sampling"
+variants = ["GBS", "Gaussian boson sampling"]
+
+[[term]]
+canonical = "random_circuit_sampling"
+variants = ["random circuit sampling", "RCS"]
+
+[[term]]
+canonical = "iqp_circuit"
+variants = ["IQP", "IQP circuit", "instantaneous quantum polynomial"]
+
+[[term]]
+canonical = "quantum_compiler"
+variants = ["quantum compiler", "quantum compilation", "circuit compilation"]
+
+[[term]]
+canonical = "qubit_routing"
+variants = ["qubit routing", "qubit mapping"]
+
+[[term]]
+canonical = "qudit"
+variants = ["qudit"]
+
+# --- Communication and cryptography ----------------------------------------
+
+[[term]]
+canonical = "qkd"
+variants = ["QKD", "quantum key distribution"]
+
+[[term]]
+canonical = "bb84"
+variants = ["BB84", "BB84 protocol"]
+
+[[term]]
+canonical = "e91"
+variants = ["E91", "Ekert protocol", "E91 protocol"]
+
+[[term]]
+canonical = "b92"
+variants = ["B92 protocol"]
+
+[[term]]
+canonical = "mdi_qkd"
+variants = ["MDI-QKD", "measurement-device-independent QKD", "measurement-device-independent quantum key distribution"]
+
+[[term]]
+canonical = "di_qkd"
+variants = ["DI-QKD", "device-independent QKD", "device-independent quantum key distribution"]
+
+[[term]]
+canonical = "cv_qkd"
+variants = ["CV-QKD", "continuous-variable QKD", "continuous-variable quantum key distribution"]
+
+[[term]]
+canonical = "tf_qkd"
+variants = ["TF-QKD", "twin-field QKD", "twin-field quantum key distribution"]
+
+[[term]]
+canonical = "decoy_state"
+variants = ["decoy state", "decoy-state method"]
+
+[[term]]
+canonical = "quantum_repeater"
+variants = ["quantum repeater"]
+
+[[term]]
+canonical = "quantum_memory"
+variants = ["quantum memory"]
+
+[[term]]
+canonical = "quantum_internet"
+variants = ["quantum internet"]
+
+[[term]]
+canonical = "quantum_network"
+variants = ["quantum network"]
+
+[[term]]
+canonical = "qrng"
+variants = ["QRNG", "quantum random number generator", "quantum random number generation"]
+
+[[term]]
+canonical = "device_independent"
+variants = ["device-independent", "device independence"]
+
+[[term]]
+canonical = "self_testing"
+variants = ["self-testing", "self testing"]
+
+[[term]]
+canonical = "post_quantum_cryptography"
+variants = ["post-quantum cryptography"]
+
+# --- Hardware and experiment -----------------------------------------------
+
+[[term]]
+canonical = "superconducting_qubit"
+variants = ["superconducting qubit", "superconducting quantum processor", "superconducting circuit"]
+
+[[term]]
+canonical = "transmon"
+variants = ["transmon", "transmon qubit"]
+
+[[term]]
+canonical = "fluxonium"
+variants = ["fluxonium", "fluxonium qubit"]
+
+[[term]]
+canonical = "flux_qubit"
+variants = ["flux qubit"]
+
+[[term]]
+canonical = "cooper_pair_box"
+variants = ["Cooper pair box", "charge qubit"]
+
+[[term]]
+canonical = "cat_qubit"
+variants = ["cat qubit", "Kerr cat", "Kerr-cat qubit", "Kerr cat qubit"]
+
+[[term]]
+canonical = "dual_rail_qubit"
+variants = ["dual-rail qubit", "dual-rail encoding"]
+
+[[term]]
+canonical = "josephson_junction"
+variants = ["Josephson junction"]
+
+[[term]]
+canonical = "squid"
+variants = ["SQUID", "superconducting quantum interference device"]
+
+[[term]]
+canonical = "twpa"
+variants = ["TWPA", "traveling-wave parametric amplifier", "travelling-wave parametric amplifier"]
+
+[[term]]
+canonical = "circuit_qed"
+variants = ["cQED", "circuit QED", "circuit quantum electrodynamics"]
+
+[[term]]
+canonical = "cavity_qed"
+variants = ["cavity QED", "cavity quantum electrodynamics"]
+
+[[term]]
+canonical = "dispersive_readout"
+variants = ["dispersive readout"]
+
+[[term]]
+canonical = "trapped_ion"
+variants = ["trapped ion", "trapped-ion", "ion trap"]
+
+[[term]]
+canonical = "neutral_atom"
+variants = ["neutral atom", "neutral-atom"]
+
+[[term]]
+canonical = "rydberg_atom"
+variants = ["Rydberg atom"]
+
+[[term]]
+canonical = "rydberg_blockade"
+variants = ["Rydberg blockade"]
+
+[[term]]
+canonical = "optical_tweezer"
+variants = ["optical tweezer"]
+
+[[term]]
+canonical = "optical_lattice"
+variants = ["optical lattice"]
+
+[[term]]
+canonical = "nv_center"
+variants = ["NV center", "NV centre", "nitrogen-vacancy center", "nitrogen-vacancy centre", "NV-center"]
+
+[[term]]
+canonical = "spin_qubit"
+variants = ["spin qubit", "silicon spin qubit"]
+
+[[term]]
+canonical = "quantum_dot"
+variants = ["quantum dot"]
+
+[[term]]
+canonical = "topological_qubit"
+variants = ["topological qubit"]
+
+[[term]]
+canonical = "photonic_qubit"
+variants = ["photonic qubit"]
+
+[[term]]
+canonical = "single_photon_source"
+variants = ["single-photon source", "single photon source"]
+
+[[term]]
+canonical = "snspd"
+variants = ["SNSPD", "superconducting nanowire single-photon detector"]
+
+[[term]]
+canonical = "spdc"
+variants = ["SPDC", "spontaneous parametric down-conversion", "spontaneous parametric downconversion"]
+
+[[term]]
+canonical = "hong_ou_mandel"
+variants = ["HOM", "Hong-Ou-Mandel", "Hong-Ou-Mandel effect", "Hong-Ou-Mandel interference", "HOM interference"]
+
+[[term]]
+canonical = "mach_zehnder_interferometer"
+variants = ["Mach-Zehnder interferometer", "MZI"]
+
+[[term]]
+canonical = "beam_splitter"
+variants = ["beam splitter", "beamsplitter"]
+
+[[term]]
+canonical = "bec"
+variants = ["BEC", "Bose-Einstein condensate", "Bose-Einstein condensation"]
+
+[[term]]
+canonical = "cavity_optomechanics"
+variants = ["cavity optomechanics", "optomechanics", "optomechanical system"]
+
+[[term]]
+canonical = "t1_time"
+variants = ["T1", "T1 time", "energy relaxation time", "relaxation time"]
+
+[[term]]
+canonical = "t2_time"
+variants = ["T2", "T2 time", "T2*", "coherence time", "dephasing time"]
+
+[[term]]
+canonical = "gate_fidelity"
+variants = ["gate fidelity", "average gate fidelity"]
+
+[[term]]
+canonical = "readout_fidelity"
+variants = ["readout fidelity", "measurement fidelity"]
+
+[[term]]
+canonical = "crosstalk"
+variants = ["crosstalk", "cross-talk"]
+
+[[term]]
+canonical = "quantum_sensing"
+variants = ["quantum sensing", "quantum sensor"]
+
+[[term]]
+canonical = "quantum_metrology"
+variants = ["quantum metrology"]
+
+[[term]]
+canonical = "quantum_thermodynamics"
+variants = ["quantum thermodynamics"]
+
+[[term]]
+canonical = "quantum_battery"
+variants = ["quantum battery"]
+
+[[term]]
+canonical = "quantum_simulator"
+variants = ["quantum simulator", "quantum simulation", "analog quantum simulation"]

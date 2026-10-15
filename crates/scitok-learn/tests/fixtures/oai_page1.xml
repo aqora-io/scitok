@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hand-written fixture in the format of arXiv's OAI-PMH ListRecords (metadataPrefix=arXiv). -->
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <responseDate>2026-10-15T06:53:32Z</responseDate>
+    <request verb="ListRecords" metadataPrefix="arXiv" from="2026-04-01" until="2026-10-15" set="physics:quant-ph">http://oaipmh.arxiv.org/oai</request>
+    <ListRecords>
+        <record>
+            <header>
+                <identifier>oai:arXiv.org:2610.01234</identifier>
+                <datestamp>2026-10-08</datestamp>
+                <setSpec>physics:quant-ph</setSpec>
+            </header>
+            <metadata>
+                <arXiv xmlns="http://arxiv.org/OAI/arXiv/">
+                    <id>2610.01234</id>
+                    <created>2026-10-07</created>
+                    <authors><author><keyname>Doe</keyname><forenames>Jane</forenames></author></authors>
+                    <title>Lieb-Robinson bounds &amp; scrambling in
+  long-range spin chains</title>
+                    <categories>quant-ph cond-mat.str-el</categories>
+                    <abstract>  We derive a Lieb-Robinson bound for power-law interactions with exponent
+$\alpha &gt; 2d$ and relate it to out-of-time-order correlators (OTOCs).
+</abstract>
+                </arXiv>
+            </metadata>
+        </record>
+        <record>
+            <header>
+                <identifier>oai:arXiv.org:2610.05555</identifier>
+                <datestamp>2026-10-09</datestamp>
+                <setSpec>physics:cond-mat</setSpec>
+                <setSpec>physics:quant-ph</setSpec>
+            </header>
+            <metadata>
+                <arXiv xmlns="http://arxiv.org/OAI/arXiv/">
+                    <id>2610.05555</id>
+                    <created>2026-10-08</created>
+                    <title>A cross-listed condensed matter paper</title>
+                    <categories>cond-mat.str-el quant-ph</categories>
+                    <abstract>Kitaev honeycomb model on a ladder.</abstract>
+                </arXiv>
+            </metadata>
+        </record>
+        <resumptionToken cursor="0" completeListSize="1500">6960524|1001</resumptionToken>
+    </ListRecords>
+</OAI-PMH>

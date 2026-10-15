@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "scitok"
+description = "Domain-aware tokenizer producing Qdrant sparse vectors for scientific papers"
+requires-python = ">=3.9"
+dynamic = ["version"]
+
+[tool.maturin]
+manifest-path = "crates/scitok/Cargo.toml"
+features = ["python"]

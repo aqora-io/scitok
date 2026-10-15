@@ -1,0 +1,31 @@
+[package]
+name = "scitok"
+description = "Domain-aware tokenizer producing Qdrant sparse vectors for scientific papers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "scitok"
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = ["domain-quant-ph"]
+python = ["dep:pyo3"]
+domain-quant-ph = []
+
+[dependencies]
+pyo3 = { version = "0.29", features = ["extension-module", "abi3-py39"], optional = true }
+rayon = "1.12"
+rust-stemmers = "1.2"
+rustc-hash = "2.1"
+serde = { version = "1.0", features = ["derive"] }
+toml = "1.1"
+unicode-normalization = "0.1"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "throughput"
+harness = false

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hand-written fixture: last page (empty resumption token), a revised old paper and a deleted record. -->
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+    <responseDate>2026-10-15T06:54:02Z</responseDate>
+    <request verb="ListRecords" resumptionToken="6960524|1001">http://oaipmh.arxiv.org/oai</request>
+    <ListRecords>
+        <record>
+            <header>
+                <identifier>oai:arXiv.org:2212.06976</identifier>
+                <datestamp>2026-10-09</datestamp>
+                <setSpec>physics:quant-ph</setSpec>
+            </header>
+            <metadata>
+                <arXiv xmlns="http://arxiv.org/OAI/arXiv/">
+                    <id>2212.06976</id>
+                    <created>2022-12-14</created>
+                    <updated>2026-10-08</updated>
+                    <title>An old paper with a new version</title>
+                    <categories>quant-ph</categories>
+                    <abstract>Revised text about the Kochen&#8211;Specker theorem.</abstract>
+                </arXiv>
+            </metadata>
+        </record>
+        <record>
+            <header status="deleted">
+                <identifier>oai:arXiv.org:2610.09999</identifier>
+                <datestamp>2026-10-09</datestamp>
+                <setSpec>physics:quant-ph</setSpec>
+            </header>
+        </record>
+        <record>
+            <header>
+                <identifier>oai:arXiv.org:2609.04321</identifier>
+                <datestamp>2026-09-30</datestamp>
+                <setSpec>physics:quant-ph</setSpec>
+            </header>
+            <metadata>
+                <arXiv xmlns="http://arxiv.org/OAI/arXiv/">
+                    <id>2609.04321</id>
+                    <created>2026-09-29</created>
+                    <title>Variational quantum eigensolvers on trapped ions</title>
+                    <categories>quant-ph physics.atom-ph</categories>
+                    <abstract>We run the variational quantum eigensolver (VQE) on a trapped-ion processor.</abstract>
+                </arXiv>
+            </metadata>
+        </record>
+        <resumptionToken cursor="1000" completeListSize="1500"/>
+    </ListRecords>
+</OAI-PMH>
