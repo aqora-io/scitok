@@ -16,6 +16,8 @@ pub struct Response {
 
 pub trait Transport {
     fn get(&mut self, url: &str) -> Result<Response, String>;
+    /// POST `body` with extra `headers` (e.g. authorization; never logged).
+    fn post(&mut self, url: &str, headers: &[(&str, &str)], body: &[u8]) -> Result<Response, String>;
 }
 
 /// Time source, so tests can run on virtual time.
@@ -108,14 +110,37 @@ impl<T: Transport, C: Clock> Client<T, C> {
     /// other 5xx and transport errors, with exponential backoff. Other
     /// statuses (including 404) are returned to the caller.
     pub fn get(&mut self, url: &str) -> Result<Response, String> {
+        self.send("GET", url, |t| t.get(url))
+    }
+
+    /// POST with the same rate limiting and retries as [`get`](Self::get).
+    pub fn post(&mut self, url: &str, headers: &[(&str, &str)], body: &[u8]) -> Result<Response, String> {
+        self.send("POST", url, |t| t.post(url, headers, body))
+    }
+
+    fn send(
+        &mut self,
+        method: &str,
+        url: &str,
+        mut request: impl FnMut(&mut T) -> Result<Response, String>,
+    ) -> Result<Response, String> {
         let mut backoff = self.interval.max(Duration::from_secs(1));
+        let mut last_failure = String::new();
         for attempt in 1..=self.max_attempts {
             self.wait_turn();
-            let result = self.transport.get(url);
+            let result = request(&mut self.transport);
             self.last = Some(self.clock.now());
             let wait = match result {
                 Ok(resp) => {
-                    self.log(&format!("GET {url} -> {}", resp.status));
+                    self.log(&format!("{method} {url} -> {}", resp.status));
+                    let body = String::from_utf8_lossy(&resp.body);
+                    // an exhausted quota is reported as 429 but will not recover
+                    if resp.status == 429 && body.contains("insufficient_quota") {
+                        return Ok(resp);
+                    }
+                    if resp.status == 429 || resp.status >= 500 {
+                        last_failure = format!("HTTP {}: {}", resp.status, body.chars().take(300).collect::<String>());
+                    }
                     if resp.status == 429 || resp.status == 503 {
                         resp.retry_after.unwrap_or(backoff)
                     } else if resp.status >= 500 {
@@ -125,7 +150,8 @@ impl<T: Transport, C: Clock> Client<T, C> {
                     }
                 }
                 Err(e) => {
-                    self.log(&format!("GET {url} failed: {e}"));
+                    self.log(&format!("{method} {url} failed: {e}"));
+                    last_failure = e;
                     backoff
                 }
             };
@@ -135,7 +161,7 @@ impl<T: Transport, C: Clock> Client<T, C> {
                 backoff *= 2;
             }
         }
-        Err(format!("GET {url}: giving up after {} attempts", self.max_attempts))
+        Err(format!("{method} {url}: giving up after {} attempts; last: {last_failure}", self.max_attempts))
     }
 
     fn wait_turn(&mut self) {
@@ -163,7 +189,8 @@ impl Ureq {
     pub fn new(contact: Option<&str>) -> Self {
         let agent = ureq::Agent::config_builder()
             .http_status_as_error(false)
-            .timeout_global(Some(Duration::from_secs(120)))
+            // LLM completions can take minutes
+            .timeout_global(Some(Duration::from_secs(600)))
             .build()
             .into();
         let version = env!("CARGO_PKG_VERSION");
@@ -180,14 +207,26 @@ const MAX_BODY: u64 = 64 * 1024 * 1024;
 
 impl Transport for Ureq {
     fn get(&mut self, url: &str) -> Result<Response, String> {
-        let mut resp = self.agent.get(url).header("User-Agent", &self.user_agent).call().map_err(|e| e.to_string())?;
-        let header = |name: &str| resp.headers().get(name).and_then(|v| v.to_str().ok()).map(str::to_owned);
-        let retry_after = header("retry-after").and_then(|v| v.trim().parse::<u64>().ok()).map(Duration::from_secs);
-        let content_type = header("content-type");
-        let status = resp.status().as_u16();
-        let body = resp.body_mut().with_config().limit(MAX_BODY).read_to_vec().map_err(|e| e.to_string())?;
-        Ok(Response { status, retry_after, content_type, body })
+        let resp = self.agent.get(url).header("User-Agent", &self.user_agent).call().map_err(|e| e.to_string())?;
+        read_response(resp)
     }
+
+    fn post(&mut self, url: &str, headers: &[(&str, &str)], body: &[u8]) -> Result<Response, String> {
+        let mut req = self.agent.post(url).header("User-Agent", &self.user_agent);
+        for (k, v) in headers {
+            req = req.header(*k, *v);
+        }
+        read_response(req.send(body).map_err(|e| e.to_string())?)
+    }
+}
+
+fn read_response(mut resp: ureq::http::Response<ureq::Body>) -> Result<Response, String> {
+    let header = |name: &str| resp.headers().get(name).and_then(|v| v.to_str().ok()).map(str::to_owned);
+    let retry_after = header("retry-after").and_then(|v| v.trim().parse::<u64>().ok()).map(Duration::from_secs);
+    let content_type = header("content-type");
+    let status = resp.status().as_u16();
+    let body = resp.body_mut().with_config().limit(MAX_BODY).read_to_vec().map_err(|e| e.to_string())?;
+    Ok(Response { status, retry_after, content_type, body })
 }
 
 #[cfg(test)]
@@ -228,12 +267,14 @@ pub mod testing {
     pub struct FakeTransport {
         pub routes: Vec<(String, VecDeque<Response>)>,
         pub log: Rc<RefCell<Vec<(Duration, String)>>>,
+        /// Bodies of POST requests, in order.
+        pub bodies: Rc<RefCell<Vec<Vec<u8>>>>,
         pub clock: FakeClock,
     }
 
     impl FakeTransport {
         pub fn new(clock: FakeClock) -> Self {
-            FakeTransport { routes: Vec::new(), log: Rc::default(), clock }
+            FakeTransport { routes: Vec::new(), log: Rc::default(), bodies: Rc::default(), clock }
         }
 
         pub fn route(&mut self, pattern: &str, status: u16, body: &[u8]) -> &mut Self {
@@ -251,6 +292,11 @@ pub mod testing {
     }
 
     impl Transport for FakeTransport {
+        fn post(&mut self, url: &str, _headers: &[(&str, &str)], body: &[u8]) -> Result<Response, String> {
+            self.bodies.borrow_mut().push(body.to_vec());
+            self.get(url)
+        }
+
         fn get(&mut self, url: &str) -> Result<Response, String> {
             self.log.borrow_mut().push((self.clock.elapsed(), url.to_owned()));
             let (_, queue) = self
@@ -305,6 +351,18 @@ mod tests {
     }
 
     #[test]
+    fn exhausted_quota_is_not_retried() {
+        let clock = FakeClock::new();
+        let mut t = FakeTransport::new(clock.clone());
+        t.route("/q", 429, b"{\"error\": {\"code\": \"insufficient_quota\"}}");
+        let log = t.log.clone();
+        let mut client = Client::with_clock(t, Rate::default(), clock);
+        client.verbose = false;
+        assert_eq!(client.post("http://x/q", &[], b"{}").unwrap().status, 429);
+        assert_eq!(log.borrow().len(), 1);
+    }
+
+    #[test]
     fn gives_up_eventually() {
         let clock = FakeClock::new();
         let mut t = FakeTransport::new(clock.clone());
@@ -312,6 +370,7 @@ mod tests {
         let mut client = Client::with_clock(t, Rate::default(), clock);
         client.verbose = false;
         client.max_attempts = 3;
-        assert!(client.get("http://x/down").is_err());
+        let Err(err) = client.get("http://x/down") else { panic!("expected an error") };
+        assert!(err.contains("last: HTTP 500"), "{err}");
     }
 }

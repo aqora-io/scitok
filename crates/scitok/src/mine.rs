@@ -162,7 +162,8 @@ impl<'t> Miner<'t> {
         }
 
         for def in acronym::definitions(atoms) {
-            let short = singularize(atoms[def.short].text).to_owned();
+            let text = def.short_text(atoms);
+            let short = singularize(&text).to_owned();
             let long_key = keys[def.long.clone()].join(" ");
             if !seen_acronyms.insert((short.clone(), long_key.clone())) {
                 continue;

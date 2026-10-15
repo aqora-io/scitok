@@ -1,0 +1,223 @@
+# scitok evaluation on quant-ph
+
+Evaluation of scitok against lexical, learned-sparse and dense retrievers on recent arXiv
+quant-ph papers, and of scitok's acronym detector against scispaCy and the reference
+Schwartz–Hearst implementation. All numbers below are on **held-out test splits** unless
+marked dev. Tuning used dev splits only.
+
+## Setup
+
+- **Corpus:** 9,264 primary quant-ph papers first submitted 2026-04-15 – 2026-10-15
+  (title + abstract; the title→paper tasks index abstracts only).
+- **No leakage from mining:** the evaluated scitok domain was mined only from the *previous*
+  six months (4,480 papers, arXiv ids 2510–2603). The curated lexicon predates the evaluation.
+- **Scoring:** every sparse system is scored like Qdrant does: a dot product, with Qdrant's IDF
+  modifier `ln(1 + (N − n + 0.5)/(n + 0.5))` for the BM25-style systems. Dense models use cosine
+  similarity. Hybrids use reciprocal rank fusion (k = 60).
+- **Splits:** by source paper, about 40% dev / 60% test, seeded.
+
+### Tasks
+
+| task | queries (test) | what it measures |
+|---|---|---|
+| **agent** | 170 (150 dev) | Realistic search: subagents wrote a keyword query and a natural-language question for 160 sampled papers, without copying titles. Graded relevance (0/1/2) on pooled top-10 results of 13 systems (11,852 judgments), judged blind. |
+| title | 5,531 | Known-item: title → its abstract. |
+| acronym | 928 | Title with an acronym ↔ long form swapped, where the abstract defines both. Easy. |
+| acronym_hard | 568 | As above, but the swapped-in form never occurs in the target abstract. Pairs come from the reference S–H implementation over the mining corpus, not from scitok. |
+
+How the agent-query judgments were made:
+- Each judge saw two queries, each with about 37 shuffled candidates under opaque ids, and had to
+  read every abstract in full.
+- A first judging round was discarded: query ids leaked the source paper, and batches were too
+  large for full reading.
+- Sanity check: although the judges could not identify it, the source paper was graded 2 for 320 of 320 queries.
+- Labels: a median of 9 relevant documents per query; 100% of every evaluated system's top 10 is judged.
+
+## Results
+
+### Realistic queries (agent, test, n = 170)
+
+| system | nDCG@10 | MRR@10 | R@100 |
+|---|---|---|---|
+| RRF(**scitok tuned** + arctic-m) | **0.764** | 0.974 | **0.975** |
+| RRF(fastembed BM25 + arctic-m) | 0.761 | 0.962 | **0.975** |
+| arctic-m (dense, snowflake-arctic-embed-m) | 0.736 | **0.979** | 0.895 |
+| opensearch-neural-sparse-v3 (gte) | 0.729 | 0.950 | 0.908 |
+| miniCOIL v1 | 0.723 | 0.956 | 0.910 |
+| **scitok (tuned)** | 0.721 | 0.966 | **0.928** |
+| bm25s (Snowball, stopwords) | 0.718 | 0.961 | 0.917 |
+| fastembed `Qdrant/bm25` | 0.716 | 0.961 | 0.914 |
+| bge-base-en-v1.5 | 0.710 | 0.952 | 0.868 |
+| SPLADE++ (prithivida) | 0.706 | 0.950 | 0.888 |
+| whitespace BM25 | 0.697 | 0.957 | 0.872 |
+| bm42 | 0.678 | 0.934 | 0.863 |
+| scitok (original defaults) | 0.678 | 0.926 | 0.899 |
+| e5-base-v2 | 0.633 | 0.911 | 0.820 |
+
+Paired bootstrap on nDCG@10 (10k resamples):
+
+| comparison | Δ | 95% CI |
+|---|---|---|
+| scitok tuned − scitok original | **+0.043** | [+0.023, +0.064] |
+| scitok tuned − fastembed BM25 | +0.004 | [−0.009, +0.017] |
+| scitok tuned − bm25s | +0.003 | [−0.010, +0.017] |
+| scitok tuned − opensearch-sparse-v3 | −0.008 | [−0.035, +0.019] |
+| scitok tuned − arctic-m | −0.015 | [−0.040, +0.011] |
+| RRF(scitok + arctic-m) − arctic-m | **+0.028** | [+0.013, +0.044] |
+| RRF(scitok + arctic-m) − RRF(fastembed + arctic-m) | +0.001 | [−0.006, +0.007] |
+
+### Proxy tasks (test)
+
+| system | title MRR@10 | acronym MRR@10 | acronym_hard MRR@10 | acronym_hard S@10 |
+|---|---|---|---|---|
+| **scitok (tuned)** | **0.897** | **0.962** | 0.772 | **0.896** |
+| scitok (original defaults) | 0.878 | 0.951 | **0.779** | 0.884 |
+| bm25s | 0.894 | 0.947 | 0.727 | 0.868 |
+| fastembed `Qdrant/bm25` | 0.892 | 0.949 | 0.718 | 0.850 |
+| whitespace BM25 | 0.875 | 0.932 | 0.713 | 0.870 |
+
+Paired bootstrap, tuned scitok − fastembed BM25 (reciprocal rank):
+
+| task | Δ | 95% CI |
+|---|---|---|
+| title | +0.005 | [+0.001, +0.008] |
+| acronym_hard | **+0.054** | [+0.036, +0.072] |
+
+### Acronym detection
+
+Precision, recall and F1 of (short form, long form) definitions:
+- Gold: agent-annotated abstracts.
+- Strict: the long form must match exactly after normalizing case, hyphens, diacritics and possessives.
+- Lenient: the long form must overlap at least half of the gold words.
+
+| detector | dev P / R / F1 (strict, n = 225) | held-out P / R / F1 (strict, n = 99) | held-out F1 (lenient) |
+|---|---|---|---|
+| **scitok** | 0.981 / 0.938 / **0.959** | 0.978 / 0.889 / **0.931** | 0.952 |
+| `abbreviations` (reference Schwartz–Hearst) | 0.959 / 0.929 / 0.944 | 0.937 / 0.899 / 0.918 | **0.979** |
+| scispaCy `AbbreviationDetector` | 0.958 / 0.916 / 0.936 | 0.947 / 0.899 / 0.922 | 0.953 |
+
+scitok's detector was improved after inspecting errors on the dev set, so the dev numbers
+are optimistic. The held-out set was annotated afterwards and never inspected:
+- On held-out, scitok has the best precision and strict F1.
+- The reference implementation has the best lenient F1, from slightly better recall.
+- Differences of about 0.01 on 99 definitions are within noise.
+
+## What tuning changed
+
+Every choice below was made on dev splits:
+
+| change | before | after | why |
+|---|---|---|---|
+| joined hyphen compounds (`two-qubit` → `twoqubit`) | on | **off** | They match unrelated papers using the same compound, and they give hyphenated words three query terms. Costs about 0.01–0.02 everywhere. |
+| weight of multi-word concept terms | 1.0 | **0.5** | Phrases in a lexicon double-count their words. At 1.0 they hurt title search and realistic queries. At 0 the acronym gains vanish, because long forms map to the acronym's concept. 0.5 was best on the agent dev set (0.748 vs 0.699 at 1.0). |
+| acronym short forms | single all-caps token | also hyphenated (`BP-OSD`) and digit-bearing (`TCL6`) forms | Better recall in acronym detection. |
+| acronym long forms | could start inside a compound | extend to the compound start | `out-of-time-order correlators`, not `of time order correlators`. |
+| mining `min_count` | 5 | 3 at 4.5k abstracts, 5 for the shipped 13.7k | More acronym pairs; collocations matter less. |
+| BM25 k1, b; stopword list | | unchanged | k1/b were flat. NLTK stopwords gave no gain over scitok's list. |
+
+The single-word part of the original concept weighting was kept. Acronym matches replace their
+unigram and always count fully.
+
+## LLM-refined lexicon
+
+`scitok-learn refine` was run with `gpt-6.1-sol` on the tuned eval domain. It saw only the
+4,480 mining-period abstracts: snippets and variant attestation come from that corpus, and none
+of the evaluation-period text was used.
+
+| step | result |
+|---|---|
+| review of 1,640 mined terms | 1,060 kept (405 renamed), 517 dropped, 63 merged |
+| expansion of 1,424 concepts | 1,475 variants proposed, 252 accepted |
+| rejected proposals | 950 not in ≥ 2 mining documents, 199 claimed by another concept, 47 too broad, 27 already known |
+| cost | 89 requests, 376k prompt + 128k completion tokens |
+
+A spot check of random decisions found them sensible:
+- Drops are generic phrases: `practical_guidance`, `attracted_considerable_attention`.
+- Merges join duplicates: `barren_plateaus` → `barren_plateau`, `gksl` → `lindblad_master_equation`,
+  `twin_field` → `tf_qkd`.
+- Added variants include `stabiliser code`, `MaxCut`, `SiV` and `GME`. A few broad acronyms
+  (`AI`, `LP`, `TN`) also passed the guards.
+
+The base lexicon's `stats.toml` length was computed before compounds were turned off. Each
+lexicon below therefore uses the BM25 `avg_len` recomputed on the mining corpus with the current
+tokenizer: 117.7 for mined, 115.9 for refined. The ablations split `reviewed.toml` into its review
+part and its added variants.
+
+Test results:
+
+| lexicon | agent nDCG@10 | title MRR@10 | acronym MRR@10 | acronym_hard MRR@10 |
+|---|---|---|---|---|
+| mined (scitok tuned, as above) | 0.721 | 0.897 | 0.962 | 0.772 |
+| mined, recomputed `avg_len` | 0.720 | 0.896 | 0.962 | 0.773 |
+| **LLM review + expand** | **0.723** | **0.898** | **0.963** | **0.777** |
+| review only | 0.722 | 0.897 | **0.963** | 0.772 |
+| expand only | 0.722 | 0.896 | **0.963** | **0.777** |
+
+Paired bootstrap, LLM review + expand − mined (recomputed `avg_len`):
+
+| task | Δ | 95% CI | queries changed |
+|---|---|---|---|
+| agent (nDCG@10) | +0.003 | [−0.001, +0.008] | 45 / 170 |
+| title | +0.001 | [+0.000, +0.002] | 108 / 5,531 |
+| acronym | +0.001 | [−0.002, +0.004] | 11 / 928 |
+| acronym_hard | +0.004 | [−0.001, +0.011] | 28 / 568 |
+
+Against fastembed BM25, the refined lexicon gains on every task:
+- agent: +0.007 [−0.007, +0.020];
+- title: +0.006 [+0.002, +0.009];
+- acronym_hard: +0.059 [+0.040, +0.078].
+
+Dev agreed with test: agent ±0.001 and acronym_hard +0.005. The judged pool still covers
+0.998 of the refined lexicon's test top 10 (dev 0.993), so unjudged documents do not matter.
+
+What the refinement did:
+- It moves every task in the right direction, but by small amounts. Only title clears zero, and
+  only barely.
+- The gains are small because the miner already finds the acronym pairs these tasks rely on.
+  Most of what the LLM adds, such as other spellings and notation, rarely separates a query from
+  its relevant papers in this corpus.
+- Expansion produces the acronym_hard gain, as expected from new acronym ↔ long-form pairs.
+- Review removes noise. Dropping 517 generic phrases changes 35 of 170 agent rankings, for
+  +0.002.
+- It never made a task worse. It also leaves a cleaner lexicon with readable names and
+  auditable reasons, so the shipped domain now uses a refined `reviewed.toml`.
+
+## Findings
+
+1. On realistic topical queries, tuned scitok is **statistically tied** with the best BM25
+   implementations and with learned sparse models (opensearch-v3, miniCOIL, SPLADE++) on nDCG@10.
+   It has the **best recall@100 among single systems** (0.928).
+2. scitok is clearly better than every BM25 baseline when **queries and papers use different
+   names for the same concept**: +0.054 MRR on acronym-swapped titles. That is what the
+   lexicon and in-document acronym expansion are for. It is also slightly but significantly
+   better on title known-item search.
+3. Combined with a dense model via RRF, scitok gives the best overall system (0.764
+   nDCG@10, 0.975 R@100). It ties a fastembed BM25 hybrid on nDCG and has higher MRR.
+   **For production, use scitok together with a dense embedding.**
+4. On this corpus the dense models are not dominant. arctic-m is the best single system on nDCG
+   and MRR, while e5-base and bge-base trail BM25. The queries were written by agents that had read the
+   abstracts, which likely favors lexical overlap.
+5. scitok embeds about 17× faster than fastembed BM25 on CPU. It is orders of magnitude faster than
+   learned sparse or dense encoders: SPLADE++ took 70 minutes for 9k abstracts on this machine.
+6. Refining the mined lexicon with an LLM (`gpt-6.1-sol`) gives small but consistent gains: +0.001
+   to +0.005 on every task. None of them is clearly significant. The main benefit is a cleaner,
+   auditable lexicon.
+
+## Limitations
+
+- Relevance labels come from LLM judges (Claude Sonnet), not domain experts. There is one judge
+  per query, so inter-annotator agreement was not measured.
+- Systems that were not in the judging pool (SPECTER2, BGE-M3, Qwen3-Embedding) are still
+  encoding on CPU and are not reported. When they are added, unjudged documents count as
+  non-relevant, which slightly disadvantages them.
+- Proxy tasks are reported for lexical systems only. Dense and learned-sparse encodings of the
+  abstract-only corpus were still running.
+- 170 test queries resolve differences of about 0.02 nDCG; smaller differences are noise.
+- The shipped built-in domain is mined (and LLM-refined) from 12 months, including the evaluation
+  period. It was not evaluated, to avoid leakage.
+- The LLM-refined lexicon was evaluated once per split with one model and one run. Different
+  models or reruns would produce somewhat different lexicons.
+
+## Reproduce
+
+See `eval/README.md`.

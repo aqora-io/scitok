@@ -23,7 +23,8 @@ def test_document_and_query_vectors(tok):
     assert len(indices) == len(values)
     assert scitok.term_id("~surface_code") in indices
     q_indices, q_values = tok.embed_query("surface code thresholds")
-    assert set(q_values) == {1.0}
+    # words count 1, multi-word concepts count concept_weight (0.5 by default)
+    assert set(q_values) == {1.0, 0.5}
     assert set(q_indices) == set(indices)
 
 

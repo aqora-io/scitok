@@ -57,6 +57,41 @@ pub struct Config {
     pub domains: Vec<Domain>,
     pub input: Input,
     pub weighting: Weighting,
+    pub options: Options,
+}
+
+/// Which parts of the pipeline emit terms (mostly for evaluation/ablation).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Options {
+    /// Emit `~concept` terms for lexicon matches.
+    pub concepts: bool,
+    /// Also emit the words of multi-word lexicon matches.
+    pub phrase_unigrams: bool,
+    /// Emit joined hyphenated compounds (`two-qubit` → `twoqubit`).
+    pub compounds: bool,
+    /// Snowball-stem plain words.
+    pub stem: bool,
+    /// Expand in-document acronym definitions.
+    pub expand_acronyms: bool,
+    /// Multiplier on the value of multi-word concept terms (phrase matches),
+    /// in documents and queries; 0 drops them. Single-word matches (acronyms)
+    /// replace their unigram and always count fully.
+    pub concept_weight: f32,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        // Tuned on the quant-ph evaluation (eval/RESULTS.md): joined compounds
+        // hurt ranking, and multi-word concepts work best at half weight.
+        Options {
+            concepts: true,
+            phrase_unigrams: true,
+            compounds: false,
+            stem: true,
+            expand_acronyms: true,
+            concept_weight: 0.5,
+        }
+    }
 }
 
 impl Default for Config {
@@ -65,7 +100,7 @@ impl Default for Config {
         let domains = vec![Domain::builtin("quant-ph").expect("built-in quant-ph domain is valid")];
         #[cfg(not(feature = "domain-quant-ph"))]
         let domains = Vec::new();
-        Config { domains, input: Input::Auto, weighting: Weighting::default() }
+        Config { domains, input: Input::Auto, weighting: Weighting::default(), options: Options::default() }
     }
 }
 
@@ -75,6 +110,7 @@ pub struct Tokenizer {
     stemmer: Stemmer,
     input: Input,
     weighting: Weighting,
+    options: Options,
     avg_len: f32,
 }
 
@@ -102,6 +138,7 @@ impl Tokenizer {
             stemmer: Stemmer::create(Algorithm::English),
             input: config.input,
             weighting: config.weighting,
+            options: config.options,
             avg_len,
         }
     }
@@ -123,21 +160,21 @@ impl Tokenizer {
     /// The terms a text is indexed under, in order (with repeats).
     pub fn tokenize(&self, text: &str) -> Vec<String> {
         let mut terms = Vec::new();
-        self.terms(text, |t| terms.push(t.to_owned()));
+        self.terms(text, |t, _| terms.push(t.to_owned()));
         terms
     }
 
     /// BM25- (or TF-) weighted sparse vector for indexing.
     pub fn embed_document(&self, text: &str) -> SparseVector {
         let mut counter = sparse::Counter::default();
-        self.terms(text, |t| counter.add(t));
+        self.terms(text, |t, phrase| counter.add(t, self.weight(phrase)));
         counter.document(self.weighting, self.avg_len)
     }
 
     /// Sparse vector for searching: weight 1 per unique term.
     pub fn embed_query(&self, text: &str) -> SparseVector {
         let mut counter = sparse::Counter::default();
-        self.terms(text, |t| counter.add(t));
+        self.terms(text, |t, phrase| counter.add(t, self.weight(phrase)));
         counter.query()
     }
 
@@ -162,7 +199,7 @@ impl Tokenizer {
     pub fn len_as(&self, text: &str, input: Input) -> usize {
         let prepared = prepare(text, input);
         let mut n = 0;
-        self.emit(lexer::lex(&prepared), |_| n += 1);
+        self.emit(lexer::lex(&prepared), |_, _| n += 1);
         n
     }
 
@@ -170,31 +207,67 @@ impl Tokenizer {
         prepare(text, self.input)
     }
 
-    fn terms(&self, text: &str, f: impl FnMut(&str)) {
+    fn weight(&self, phrase: bool) -> f32 {
+        if phrase { self.options.concept_weight } else { 1.0 }
+    }
+
+    /// In-document acronym definitions as `(short form, long form)`.
+    pub fn acronym_definitions(&self, text: &str) -> Vec<(String, String)> {
+        let prepared = self.prepare(text);
+        let atoms = lexer::lex(&prepared);
+        acronym::definitions(&atoms)
+            .into_iter()
+            .map(|d| {
+                let mut long = String::new();
+                for a in &atoms[d.long.clone()] {
+                    long.push_str(a.text);
+                    long.push(if a.hyphen_next { '-' } else { ' ' });
+                }
+                long.pop();
+                (d.short_text(&atoms), long)
+            })
+            .collect()
+    }
+
+    fn terms(&self, text: &str, f: impl FnMut(&str, bool)) {
         let prepared = self.prepare(text);
         self.emit(lexer::lex(&prepared), f);
     }
 
-    fn emit(&self, atoms: Vec<Atom>, mut f: impl FnMut(&str)) {
-        let atoms = acronym::expand(atoms, |a| self.lexicon.contains_key(&key(a)));
+    fn emit(&self, atoms: Vec<Atom>, mut f: impl FnMut(&str, bool)) {
+        let opts = &self.options;
+        let atoms = if opts.expand_acronyms {
+            acronym::expand(atoms, |a| self.lexicon.contains_key(&key(a)))
+        } else {
+            atoms
+        };
         let (mut buf, mut lower, mut term) = (String::new(), String::new(), String::new());
         let mut no_match_until = 0;
         for (i, atom) in atoms.iter().enumerate() {
             if !atom.is_term() {
                 continue;
             }
-            let mut consumed = false;
-            if i >= no_match_until
-                && let Some((n, id)) = self.lexicon.longest_match(&atoms[i..], &mut buf) {
-                    f(self.lexicon.term(id));
-                    consumed = n == 1;
-                    no_match_until = i + n;
+            // inside a match: unigrams only if phrase_unigrams
+            let mut consumed = i < no_match_until && !opts.phrase_unigrams;
+            if opts.concepts
+                && i >= no_match_until
+                && let Some((n, id)) = self.lexicon.longest_match(&atoms[i..], &mut buf)
+            {
+                if n == 1 || opts.concept_weight > 0.0 {
+                    f(self.lexicon.term(id), n > 1);
                 }
-            if !consumed && self.unigram(atom, &mut lower, &mut term) {
-                f(&term);
+                consumed = n == 1 || !opts.phrase_unigrams;
+                no_match_until = i + n;
             }
-            if atom.hyphen_next && (i == 0 || !atoms[i - 1].hyphen_next) && self.compound(&atoms[i..], &mut lower, &mut term) {
-                f(&term);
+            if !consumed && self.unigram(atom, &mut lower, &mut term) {
+                f(&term, false);
+            }
+            if opts.compounds
+                && atom.hyphen_next
+                && (i == 0 || !atoms[i - 1].hyphen_next)
+                && self.compound(&atoms[i..], &mut lower, &mut term)
+            {
+                f(&term, false);
             }
         }
     }
@@ -211,7 +284,8 @@ impl Tokenizer {
         }
         out.clear();
         match atom.kind {
-            Kind::Word => self.stem(lower, out),
+            Kind::Word if self.options.stem => self.stem(lower, out),
+            Kind::Word => out.push_str(lower),
             _ => push_key(atom, out),
         }
         true
@@ -227,7 +301,7 @@ impl Tokenizer {
             return false;
         }
         out.clear();
-        if parts.iter().all(|a| a.kind == Kind::Word) {
+        if self.options.stem && parts.iter().all(|a| a.kind == Kind::Word) {
             self.stem(joined, out);
         } else {
             out.push_str(joined);

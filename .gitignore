@@ -3,3 +3,10 @@ target/
 .venv/
 __pycache__/
 *.so
+eval/.venv*/
+eval/cache/
+# evaluation data and outputs; only the code and docs are versioned (see eval/README.md)
+eval/data/
+eval/results/
+eval/domains/
+.envrc

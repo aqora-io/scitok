@@ -5,6 +5,7 @@ mod fulltext;
 mod http;
 mod learn;
 mod oai;
+mod refine;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -39,6 +40,13 @@ enum Command {
         common: Common,
         #[command(flatten)]
         build: BuildArgs,
+    },
+    /// Review the mined lexicon and add variants with an LLM (writes reviewed.toml).
+    Refine {
+        #[command(flatten)]
+        common: Common,
+        #[command(flatten)]
+        refine: RefineArgs,
     },
     /// `fetch` followed by `build`.
     Learn {
@@ -113,6 +121,34 @@ struct BuildArgs {
     /// Longest collocation, in words.
     #[arg(long, default_value_t = MineConfig::default().max_ngram)]
     max_ngram: usize,
+}
+
+#[derive(Args)]
+struct RefineArgs {
+    /// Domain directory with curated.toml and mined.toml [default: crates/scitok/data/domains/<category>].
+    #[arg(long)]
+    out: Option<PathBuf>,
+    /// Chat model; any model supporting JSON-schema structured output.
+    #[arg(long, default_value = "gpt-6.1-sol")]
+    model: String,
+    /// OpenAI-compatible API base URL. The key is read from OPENAI_API_KEY.
+    #[arg(long, default_value = "https://api.openai.com/v1")]
+    base_url: String,
+    /// Mined entries per review request.
+    #[arg(long, default_value_t = refine::RefineConfig::default().review_batch)]
+    review_batch: usize,
+    /// Concepts per expansion request.
+    #[arg(long, default_value_t = refine::RefineConfig::default().expand_batch)]
+    expand_batch: usize,
+    /// Minimum number of documents a proposed variant must occur in.
+    #[arg(long, default_value_t = refine::RefineConfig::default().min_attested)]
+    min_attested: u32,
+    /// API request rate.
+    #[arg(long, default_value = "1/1s")]
+    rate: Rate,
+    /// Count the requests that would be made (cached ones are free) without calling the API.
+    #[arg(long)]
+    dry_run: bool,
 }
 
 impl Common {
@@ -194,10 +230,49 @@ fn build(common: &Common, args: &BuildArgs) -> Result<(), String> {
     Ok(())
 }
 
+fn refine(common: &Common, args: &RefineArgs) -> Result<(), String> {
+    let filter = common.filter()?;
+    let cache = Cache::open(&common.cache_dir, &filter.category)?;
+    let out = args.out.clone().unwrap_or_else(|| PathBuf::from("crates/scitok/data/domains").join(&filter.category));
+    let mut client = Client::new(Ureq::new(None), args.rate);
+    // completions are slow and billed: fewer retries than for arXiv
+    client.max_attempts = 3;
+    let mut llm = refine::Llm {
+        client,
+        base_url: args.base_url.clone(),
+        model: args.model.clone(),
+        api_key: std::env::var("OPENAI_API_KEY").ok().filter(|k| !k.is_empty()),
+        cache_dir: common.cache_dir.join(&filter.category).join("llm"),
+        dry_run: args.dry_run,
+        calls: 0,
+        cached: 0,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+    };
+    let cfg = refine::RefineConfig { review_batch: args.review_batch, expand_batch: args.expand_batch, min_attested: args.min_attested };
+    let r = refine::refine(&mut llm, &cache, &filter, &out, &cfg)?;
+    if args.dry_run {
+        eprintln!("dry run: {} API requests needed ({} cached)", llm.calls, llm.cached);
+        return Ok(());
+    }
+    eprintln!(
+        "review: {} kept ({} renamed), {} dropped, {} merged, {} undecided\n\
+         expand: {} proposed, {} accepted, {} not in corpus, {} conflicting, {} already known, {} too broad\n\
+         API: {} requests ({} cached), {} prompt + {} completion tokens\n\
+         avg_len {} written to stats.toml; wrote {}",
+        r.kept, r.renamed, r.dropped, r.merged, r.undecided,
+        r.proposed, r.accepted, r.unattested, r.conflicting, r.duplicates, r.too_broad,
+        llm.calls, llm.cached, llm.prompt_tokens, llm.completion_tokens,
+        r.avg_len, out.join("reviewed.toml").display()
+    );
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let result = match Cli::parse().command {
         Command::Fetch { common, fetch: f } => fetch(&common, &f),
         Command::Build { common, build: b } => build(&common, &b),
+        Command::Refine { common, refine: r } => refine(&common, &r),
         Command::Learn { common, fetch: f, build: b } => fetch(&common, &f).and_then(|()| build(&common, &b)),
     };
     match result {

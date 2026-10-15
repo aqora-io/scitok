@@ -11,16 +11,15 @@ What it does differently from a generic BM25 tokenizer:
 | --- | --- |
 | `We run QAOA` | `run` `~qaoa` |
 | `the quantum approximate optimization algorithm` | `~qaoa` `quantum` `approxim` `optim` `algorithm` |
-| `Lieb–Robinson bounds` / `Lieb--Robinson bound` | `~lieb_robinson_bound` `lieb` `liebrobinson` `robinson` `bound` |
-| `Lieb Robinson bound` | `~lieb_robinson_bound` `lieb` `robinson` `bound` |
+| `Lieb–Robinson bounds` / `Lieb--Robinson bound` / `Lieb Robinson bound` | `~lieb_robinson_bound` `lieb` `robinson` `bound` |
 | `Schr\"odinger cat states` (LaTeX) / `Schrödinger cat states` | `~cat_state` `schroding` `cat` `state` |
 | `$O(\sqrt{N})$ queries via Grover's algorithm \cite{g96}` | `queri` `~grover_algorithm` `grover` `algorithm` |
 | `the frobnicated quantum widget (FQW) ... the FQW` | later `FQW`s also count toward `frobnic` `quantum` `widget` |
 | `ETH` vs `eth` (case-sensitive acronym) | `~eth` vs `eth` |
 
 - **Concept terms** (`~…`): acronyms, spelling variants and long forms map to one term. Phrase
-  matches emit the concept *and* the constituent words, so you get the phrase's precision and
-  the words' recall.
+  matches emit the concept at half weight *and* the constituent words, so you get the phrase's
+  precision and the words' recall. Acronym matches replace the word and count fully.
 - **LaTeX**: inline math in abstracts and full `.tex` sources. Citations, references, floats
   (except captions), comments and math are dropped; `SU(2)`, `\mathbb{Z}_2`, `$T$-gate` survive.
 - **Normalization**: ligatures, diacritics, Greek letters, dashes (including LaTeX `--`),
@@ -59,8 +58,15 @@ hits = client.query_points("papers", query=models.SparseVector(indices=idx, valu
 ```
 
 Options: `Tokenizer(domains=["quant-ph"], domain_paths=["path/to/domain"], input="auto"|"plain"|"latex",
-weighting="bm25"|"tf", k1=1.2, b=0.75, avg_len=None)`. Also available: `tok.tokenize(text)` for
-inspection, `scitok.builtin_domains()` and `scitok.term_id(term)`.
+weighting="bm25"|"tf", k1=1.2, b=0.75, avg_len=None)`. The pipeline switches `concepts`,
+`phrase_unigrams`, `compounds`, `stem`, `expand_acronyms` and `concept_weight` default to the
+values tuned in the evaluation. Also available: `tok.tokenize(text)` for inspection,
+`tok.acronym_definitions(text)`, `scitok.builtin_domains()` and `scitok.term_id(term)`.
+
+For hybrid search, combine scitok with a dense model using Qdrant's RRF fusion. This was the
+best setup in the evaluation, and
+[examples/qdrant_hybrid.py](examples/qdrant_hybrid.py) shows how. Don't lowercase queries,
+because acronyms like `ETH` are case-sensitive. Re-index after upgrading scitok.
 
 Use `input="latex"` for full LaTeX documents. Its BM25 `avg_len` defaults to the domain's
 full-text average when that exists. Keep abstracts and full texts in separate sparse vectors.
@@ -91,6 +97,7 @@ A domain is a directory named after an arXiv category:
 | --- | --- | --- |
 | `curated.toml` | hand | Lexicon. Always wins over mined entries. |
 | `mined.toml` | `scitok-learn` | Lexicon: acronyms, eponyms, collocations. Regenerated, reviewed in diffs. |
+| `reviewed.toml` | `scitok-learn refine` | LLM-reviewed `mined.toml` plus added variants (optional). Loaded instead of `mined.toml`. |
 | `stats.toml` | `scitok-learn` | Corpus size, date range, average document length (BM25 `avg_len`). |
 | `stopwords.txt` | hand | Extra stopwords (optional). |
 | `stopword_candidates.txt` | `scitok-learn` | Very high document-frequency words, for review only. Not loaded. |
@@ -138,6 +145,7 @@ cargo run --release -p scitok-learn -- learn --category cond-mat.str-el \
   `crates/scitok/data/domains/<category>`; change it with `--out`. Iterate on thresholds with
   `--min-count`, `--min-npmi`, `--max-phrases` and `--max-ngram`.
 - `learn` runs `fetch` then `build`.
+- `refine` reviews `build`'s output with an LLM and writes `reviewed.toml` (see below).
 
 Harvesting is polite and resumable:
 - The default rate is `--rate 1/3s`, arXiv's policy. Faster rates print a warning.
@@ -157,8 +165,54 @@ Mining runs on the same tokens as runtime tokenization, against the curated lexi
 - 2–4-word collocations: ranked by NPMI × log document frequency, with generic academic phrases
   filtered out.
 
-The shipped `quant-ph` domain was built from the 9,264 quant-ph papers submitted between
-2026-04-15 and 2026-10-15 (abstracts only). It combines 364 curated and about 1,700 mined terms.
+### LLM review: `refine`
+
+```bash
+export OPENAI_API_KEY=...
+cargo run --release -p scitok-learn -- refine --category quant-ph --from 2025-10-15 --until 2026-10-15 --dry-run
+cargo run --release -p scitok-learn -- refine --category quant-ph --from 2025-10-15 --until 2026-10-15
+```
+
+Use the same date range as `build`. `refine` makes two passes over the domain with a chat model
+(default `gpt-6.1-sol`; any OpenAI-compatible endpoint via `--base-url`):
+- **Review:** each mined term, shown with its document frequency and corpus snippets, is kept
+  (optionally under a more readable canonical name), dropped as generic, or merged into another
+  concept. Curated entries are never changed.
+- **Expand:** curated and kept concepts get other names, spellings and acronym ↔ long forms.
+  Proposals are checked in code, not trusted:
+  - a variant is kept only if it occurs in at least `--min-attested` (2) corpus documents;
+  - variants that already belong to another concept are rejected;
+  - so is a single plain word as a variant of a multi-word concept.
+
+The output is `reviewed.toml`, with every decision and its reason as a comment. The command also
+updates `stats.toml`. Responses are cached in `.scitok-cache/<category>/llm/`, so reruns are
+free. `--dry-run` counts the requests a run would make. `build` deletes a stale `reviewed.toml`,
+so run `refine` again after rebuilding.
+
+The shipped `quant-ph` domain was built from the 13,744 quant-ph papers submitted between
+2025-10-15 and 2026-10-15 (abstracts only, `--min-count 5`). It combines 364 curated and 2,229
+mined terms. `refine` with `gpt-6.1-sol` then reviewed the mined terms:
+- 1,536 kept;
+- 84 merged into other concepts;
+- 609 dropped as generic;
+- 589 variants added.
+
+## Evaluation
+
+The full evaluation is in [eval/RESULTS.md](eval/RESULTS.md). It was run on 9,264 recent quant-ph
+papers against 13 retrievers, with relevance judged blind, and tuned on dev splits only. On the
+test splits:
+- **Realistic topical queries:** scitok ties the best BM25 implementations and learned sparse
+  models (nDCG@10 0.721 vs 0.716–0.729) and has the best single-system recall@100 (0.928).
+- **Concept name differs between query and paper:** scitok clearly wins, at +0.054 MRR over
+  fastembed BM25 on acronym-swapped queries.
+- **Hybrid:** RRF of scitok with a dense model (snowflake-arctic-embed-m) is the best system
+  overall (0.764 nDCG@10, 0.975 R@100). Use scitok as the sparse half of a hybrid setup.
+- **Acronym detection:** on held-out annotated abstracts, scitok has the highest precision and
+  strict F1 (0.931), against scispaCy (0.922) and the reference Schwartz–Hearst implementation
+  (0.918).
+- **LLM-refined lexicon (`refine`):** small gains on every task (+0.001 to +0.005), none clearly
+  significant. It never hurt, and it removed a third of the mined entries as generic.
 
 ## Performance
 

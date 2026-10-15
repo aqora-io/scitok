@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-use crate::{Config, Domain, Input, SparseVector, Tokenizer, Weighting};
+use crate::{Config, Domain, Input, Options, SparseVector, Tokenizer, Weighting};
 
 type Sparse = (Vec<u32>, Vec<f32>);
 
@@ -22,6 +22,8 @@ fn pair(v: SparseVector) -> Sparse {
 ///     weighting: ``"bm25"`` or ``"tf"`` for document vectors.
 ///     k1, b: BM25 parameters.
 ///     avg_len: BM25 average document length; default from the first domain's stats.
+///     concepts, phrase_unigrams, compounds, stem, expand_acronyms, concept_weight:
+///         pipeline options (see the Rust ``Options`` docs), mainly for evaluation.
 #[pyclass(name = "Tokenizer", module = "scitok", frozen)]
 struct PyTokenizer {
     inner: Tokenizer,
@@ -30,7 +32,11 @@ struct PyTokenizer {
 #[pymethods]
 impl PyTokenizer {
     #[new]
-    #[pyo3(signature = (domains=None, domain_paths=None, input="auto", weighting="bm25", k1=1.2, b=0.75, avg_len=None))]
+    #[pyo3(signature = (
+        domains=None, domain_paths=None, input="auto", weighting="bm25", k1=1.2, b=0.75, avg_len=None,
+        concepts=true, phrase_unigrams=true, compounds=false, stem=true, expand_acronyms=true, concept_weight=0.5,
+    ))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         domains: Option<Vec<String>>,
         domain_paths: Option<Vec<PathBuf>>,
@@ -39,6 +45,12 @@ impl PyTokenizer {
         k1: f32,
         b: f32,
         avg_len: Option<f32>,
+        concepts: bool,
+        phrase_unigrams: bool,
+        compounds: bool,
+        stem: bool,
+        expand_acronyms: bool,
+        concept_weight: f32,
     ) -> PyResult<Self> {
         let err = |e: crate::Error| PyValueError::new_err(e.0);
         let mut loaded = match domains {
@@ -59,7 +71,8 @@ impl PyTokenizer {
             "tf" => Weighting::Tf,
             other => return Err(PyValueError::new_err(format!("weighting must be bm25 or tf, not {other:?}"))),
         };
-        Ok(PyTokenizer { inner: Tokenizer::new(Config { domains: loaded, input, weighting }) })
+        let options = Options { concepts, phrase_unigrams, compounds, stem, expand_acronyms, concept_weight };
+        Ok(PyTokenizer { inner: Tokenizer::new(Config { domains: loaded, input, weighting, options }) })
     }
 
     /// Terms a text is indexed under, in order.
@@ -80,6 +93,11 @@ impl PyTokenizer {
     /// ``(indices, values)`` for a search query (weight 1 per unique term).
     fn embed_query(&self, py: Python<'_>, text: &str) -> Sparse {
         py.detach(|| pair(self.inner.embed_query(text)))
+    }
+
+    /// In-document acronym definitions as ``[(short, long), ...]``.
+    fn acronym_definitions(&self, py: Python<'_>, text: &str) -> Vec<(String, String)> {
+        py.detach(|| self.inner.acronym_definitions(text))
     }
 
     /// Average document length used for BM25.

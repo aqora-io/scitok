@@ -5,23 +5,50 @@
 use crate::lexer::{Atom, BREAK, Kind};
 use crate::lexicon::singularize;
 
+use std::ops::Range;
+
 pub struct Definition {
-    /// Index of the acronym atom (inside the parentheses).
-    pub short: usize,
+    /// Atom range of the short form inside the parentheses: one acronym, or
+    /// a hyphenated chain such as `BP-OSD`.
+    pub short: Range<usize>,
     /// Atom range of the long form.
-    pub long: std::ops::Range<usize>,
+    pub long: Range<usize>,
+}
+
+impl Definition {
+    /// The short form as written, with hyphens between chained parts.
+    pub fn short_text(&self, atoms: &[Atom]) -> String {
+        atoms[self.short.clone()].iter().map(|a| a.text).collect::<Vec<_>>().join("-")
+    }
+}
+
+/// Acronym-like: `VQE`, `qLDPC`, or letters with digits and two capitals (`TCL6`, `2BGA`).
+fn acronym_like(a: &Atom) -> bool {
+    a.kind == Kind::Acronym || (a.kind == Kind::AlphaNum && a.text.chars().filter(|c| c.is_uppercase()).count() >= 2)
 }
 
 pub fn definitions(atoms: &[Atom]) -> Vec<Definition> {
     let mut defs = Vec::new();
     for i in 1..atoms.len().saturating_sub(2) {
-        let short = &atoms[i + 1];
-        if atoms[i].kind != Kind::Open || atoms[i + 2].kind != Kind::Close || short.kind != Kind::Acronym {
+        if atoms[i].kind != Kind::Open {
             continue;
         }
-        let letters = singularize(short.text);
-        let n = letters.chars().count();
-        if !(2..=10).contains(&n) {
+        // short form: up to 3 hyphen-joined parts, closed by `)`
+        let mut end = i + 1;
+        while end < atoms.len() && atoms[end].is_term() && atoms[end].hyphen_next && end - i < 3 {
+            end += 1;
+        }
+        if end >= atoms.len() - 1 || !atoms[end].is_term() || atoms[end].hyphen_next || atoms[end + 1].kind != Kind::Close {
+            continue;
+        }
+        let short = &atoms[i + 1..=end];
+        if !short.iter().any(acronym_like) {
+            continue;
+        }
+        let mut letters: String = short.iter().map(|a| a.text).collect();
+        letters.truncate(singularize(&letters).len());
+        let n = letters.chars().filter(|c| c.is_alphanumeric()).count();
+        if !(2..=12).contains(&n) {
             continue;
         }
         let window = (n + 5).min(2 * n);
@@ -32,10 +59,16 @@ pub fn definitions(atoms: &[Atom]) -> Vec<Definition> {
         if start == i {
             continue;
         }
-        if let Some(offset) = best_long_form(letters, &atoms[start..i])
-            && (i - (start + offset) >= 2 || n <= 3) {
-                defs.push(Definition { short: i + 1, long: start + offset..i });
+        if let Some(offset) = best_long_form(&letters, &atoms[start..i]) {
+            // don't start inside a hyphenated compound (`out-of-time-order`)
+            let mut first = start + offset;
+            while first > 0 && atoms[first - 1].hyphen_next && atoms[first - 1].is_term() {
+                first -= 1;
             }
+            if i - first >= 2 || n <= 3 {
+                defs.push(Definition { short: i + 1..end + 1, long: first..i });
+            }
+        }
     }
     defs
 }
@@ -54,7 +87,8 @@ fn best_long_form(short: &str, words: &[Atom]) -> Option<usize> {
     let short: Vec<char> = short.chars().flat_map(char::to_lowercase).collect();
     let mut l = chars.len() as isize - 1;
     for (s, &sc) in short.iter().enumerate().rev() {
-        if !sc.is_alphanumeric() {
+        // digits often stand for spelled-out numbers (`TCL6`: sixth-order ...)
+        if !sc.is_alphabetic() {
             continue;
         }
         while l >= 0 && (chars[l as usize].0 != sc || (s == 0 && !chars[l as usize].2)) {
@@ -79,10 +113,15 @@ pub fn expand<'a>(atoms: Vec<Atom<'a>>, known: impl Fn(&Atom) -> bool) -> Vec<At
     let mut active: Vec<&Definition> = Vec::new();
     let mut next_def = defs.iter().peekable();
     for (i, atom) in atoms.iter().enumerate() {
-        if next_def.peek().is_some_and(|d| d.short < i) {
+        if next_def.peek().is_some_and(|d| d.short.start < i) {
             let d = next_def.next().unwrap();
-            let short = singularize(atoms[d.short].text);
-            if !known(&atoms[d.short]) && !active.iter().any(|a| singularize(atoms[a.short].text) == short) {
+            // only single-atom short forms are expanded at later uses
+            let single = d.short.len() == 1;
+            let short = singularize(atoms[d.short.start].text);
+            if single
+                && !known(&atoms[d.short.start])
+                && !active.iter().any(|a| singularize(atoms[a.short.start].text) == short)
+            {
                 active.push(d);
             }
         }
@@ -90,7 +129,7 @@ pub fn expand<'a>(atoms: Vec<Atom<'a>>, known: impl Fn(&Atom) -> bool) -> Vec<At
             let short = singularize(atom.text);
             // inside a compound (`ADAPT-VQE`) an inserted break would split it
             let in_compound = out.last().is_some_and(|a: &Atom| a.hyphen_next);
-            if let Some(d) = active.iter().find(|d| singularize(atoms[d.short].text) == short).filter(|_| !in_compound) {
+            if let Some(d) = active.iter().find(|d| singularize(atoms[d.short.start].text) == short).filter(|_| !in_compound) {
                 out.push(BREAK);
                 out.extend_from_slice(&atoms[d.long.clone()]);
                 if let Some(last) = out.last_mut() {
@@ -114,8 +153,8 @@ mod tests {
         definitions(&atoms)
             .into_iter()
             .map(|d| {
-                let long: Vec<&str> = atoms[d.long].iter().map(|a| a.text).collect();
-                (atoms[d.short].text.to_owned(), long.join(" "))
+                let long: Vec<&str> = atoms[d.long.clone()].iter().map(|a| a.text).collect();
+                (d.short_text(&atoms), long.join(" "))
             })
             .collect()
     }
@@ -136,6 +175,18 @@ mod tests {
         );
         assert_eq!(long_forms("quantum processing units (QPUs)"), vec![("QPUs".into(), "quantum processing units".into())]);
         assert!(long_forms("we find (QAOA) works").is_empty());
+        assert_eq!(
+            long_forms("belief propagation with ordered statistics decoding (BP-OSD)"),
+            vec![("BP-OSD".into(), "belief propagation with ordered statistics decoding".into())]
+        );
+        assert_eq!(
+            long_forms("sixth-order time-convolutionless (TCL6) master equation"),
+            vec![("TCL6".into(), "time convolutionless".into())]
+        );
+        assert_eq!(
+            long_forms("out-of-time-order correlators (OTOCs)"),
+            vec![("OTOCs".into(), "out of time order correlators".into())]
+        );
         assert!(long_forms("a random sentence (XYZ)").is_empty());
     }
 

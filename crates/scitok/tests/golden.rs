@@ -36,7 +36,7 @@ fn latex_fragments_in_abstracts() {
         terms("$O(\\sqrt{N})$ queries via Grover's algorithm \\cite{grover96}"),
         vec!["queri", "~grover_algorithm", "grover", "algorithm"]
     );
-    assert_eq!(terms("a $T$-gate"), vec!["~t_gate", "tgate", "gate"]);
+    assert_eq!(terms("a $T$-gate"), vec!["~t_gate", "gate"]);
     assert!(has("$\\mathrm{SU}(2)$ symmetry", "su(2)"));
     assert!(has("SU(2) symmetry", "su(2)"));
 }
@@ -44,11 +44,16 @@ fn latex_fragments_in_abstracts() {
 #[test]
 fn eponyms_and_hyphens() {
     let t = terms("Lieb–Robinson bounds");
-    assert_eq!(t, vec!["~lieb_robinson_bound", "lieb", "liebrobinson", "robinson", "bound"]);
+    assert_eq!(t, vec!["~lieb_robinson_bound", "lieb", "robinson", "bound"]);
     assert_eq!(terms("Lieb-Robinson bound"), t);
-    assert!(has("Lieb Robinson bound", "~lieb_robinson_bound"));
-    assert!(has("two-qubit gates", "twoqubit"));
-    assert!(has("nonlocal", "nonloc") && has("non-local", "nonloc"));
+    assert_eq!(terms("Lieb Robinson bound"), t);
+    // joined compounds are opt-in
+    let with_compounds = Tokenizer::new(Config {
+        options: scitok::Options { compounds: true, ..Default::default() },
+        ..Config::default()
+    });
+    assert!(with_compounds.tokenize("two-qubit gates").contains(&"twoqubit".to_string()));
+    assert!(with_compounds.tokenize("non-local").contains(&"nonloc".to_string()));
 }
 
 #[test]
@@ -82,8 +87,9 @@ fn query_and_document_share_indices() {
 #[test]
 fn query_values_are_one_per_unique_term() {
     let q = tok().embed_query("surface code surface code");
-    assert!(q.values.iter().all(|&v| v == 1.0));
-    assert!(q.indices.contains(&term_id("~surface_code")));
+    let value = |t: &str| q.values[q.indices.iter().position(|&i| i == term_id(t)).unwrap()];
+    // words count 1, multi-word concepts count concept_weight (0.5 by default)
+    assert_eq!((value("surfac"), value("code"), value("~surface_code")), (1.0, 1.0, 0.5));
 }
 
 #[test]
@@ -167,4 +173,29 @@ fn random_inputs_never_panic() {
         tok.embed_document(&s);
         latex.embed_document(&s);
     }
+}
+
+#[test]
+fn options_toggle_pipeline_parts() {
+    use scitok::Options;
+    let with = |options: Options| Tokenizer::new(Config { options, ..Config::default() });
+    let text = "Lieb-Robinson bounds";
+    let no_concepts = with(Options { concepts: false, ..Options::default() }).tokenize(text);
+    assert_eq!(no_concepts, vec!["lieb", "robinson", "bound"]);
+    let phrase_only = with(Options { phrase_unigrams: false, compounds: false, ..Options::default() }).tokenize(text);
+    assert_eq!(phrase_only, vec!["~lieb_robinson_bound"]);
+    assert_eq!(with(Options { stem: false, ..Options::default() }).tokenize("entangled qubits"), vec!["entangled", "qubits"]);
+    let weighted = with(Options { concept_weight: 2.0, ..Options::default() }).embed_query("QAOA surface code");
+    let value = |t: &str| weighted.values[weighted.indices.iter().position(|&i| i == term_id(t)).unwrap()];
+    assert_eq!((value("~qaoa"), value("~surface_code")), (1.0, 2.0));
+    let dropped = with(Options { concept_weight: 0.0, ..Options::default() }).tokenize("QAOA surface code");
+    assert_eq!(dropped, vec!["~qaoa", "surfac", "code"]);
+}
+
+#[test]
+fn acronym_definitions_api() {
+    assert_eq!(
+        tok().acronym_definitions("noisy intermediate-scale quantum (NISQ) devices"),
+        vec![("NISQ".to_string(), "noisy intermediate-scale quantum".to_string())]
+    );
 }

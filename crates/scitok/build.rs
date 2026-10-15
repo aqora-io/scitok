@@ -5,7 +5,7 @@ use std::fmt::Write;
 use std::path::Path;
 use std::{env, fs};
 
-const FILES: [&str; 4] = ["curated.toml", "mined.toml", "stats.toml", "stopwords.txt"];
+const FILES: [&str; 5] = ["curated.toml", "mined.toml", "stats.toml", "stopwords.txt", "reviewed.toml"];
 
 fn main() {
     let root = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).join("data/domains");
@@ -15,7 +15,7 @@ fn main() {
         .unwrap_or_default();
     dirs.sort_by_key(|e| e.file_name());
 
-    let mut code = String::from("pub(crate) static BUILTIN: &[(&str, [Option<&str>; 4])] = &[\n");
+    let mut code = String::from("pub(crate) static BUILTIN: &[(&str, [Option<&str>; 5])] = &[\n");
     for dir in dirs {
         let name = dir.file_name().into_string().unwrap();
         let feature = format!("CARGO_FEATURE_DOMAIN_{}", name.to_uppercase().replace(['-', '.'], "_"));

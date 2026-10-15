@@ -57,40 +57,45 @@ pub fn murmur3_32(data: &[u8], seed: u32) -> u32 {
     h ^ (h >> 16)
 }
 
-/// Accumulates term counts by id (hash collisions merge).
+/// Accumulates term counts by id (hash collisions merge), with a per-term
+/// value multiplier applied after weighting.
 #[derive(Default)]
 pub struct Counter {
-    counts: FxHashMap<u32, f32>,
+    counts: FxHashMap<u32, (f32, f32)>,
     total: usize,
 }
 
 impl Counter {
-    pub fn add(&mut self, term: &str) {
-        *self.counts.entry(term_id(term)).or_default() += 1.0;
+    pub fn add(&mut self, term: &str, multiplier: f32) {
+        let entry = self.counts.entry(term_id(term)).or_insert((0.0, multiplier));
+        entry.0 += 1.0;
+        entry.1 = entry.1.max(multiplier);
         self.total += 1;
     }
 
     pub fn document(self, weighting: Weighting, default_avg_len: f32) -> SparseVector {
         let len = self.total as f32;
-        self.finish(|tf| match weighting {
-            Weighting::Tf => tf,
-            Weighting::Bm25 { k1, b, avg_len } => {
-                let avg = avg_len.unwrap_or(default_avg_len).max(1.0);
-                tf * (k1 + 1.0) / (tf + k1 * (1.0 - b + b * len / avg))
+        self.finish(|tf, m| {
+            m * match weighting {
+                Weighting::Tf => tf,
+                Weighting::Bm25 { k1, b, avg_len } => {
+                    let avg = avg_len.unwrap_or(default_avg_len).max(1.0);
+                    tf * (k1 + 1.0) / (tf + k1 * (1.0 - b + b * len / avg))
+                }
             }
         })
     }
 
     pub fn query(self) -> SparseVector {
-        self.finish(|_| 1.0)
+        self.finish(|_, m| m)
     }
 
-    fn finish(self, weight: impl Fn(f32) -> f32) -> SparseVector {
-        let mut pairs: Vec<(u32, f32)> = self.counts.into_iter().collect();
+    fn finish(self, weight: impl Fn(f32, f32) -> f32) -> SparseVector {
+        let mut pairs: Vec<(u32, (f32, f32))> = self.counts.into_iter().collect();
         pairs.sort_unstable_by_key(|&(i, _)| i);
         SparseVector {
             indices: pairs.iter().map(|&(i, _)| i).collect(),
-            values: pairs.iter().map(|&(_, tf)| weight(tf)).collect(),
+            values: pairs.iter().map(|&(_, (tf, m))| weight(tf, m)).collect(),
         }
     }
 }
@@ -112,7 +117,7 @@ mod tests {
     fn bm25_saturates() {
         let mut c = Counter::default();
         for t in ["a", "a", "b"] {
-            c.add(t);
+            c.add(t, 1.0);
         }
         let v = c.document(Weighting::Bm25 { k1: 1.2, b: 0.75, avg_len: Some(3.0) }, 100.0);
         let a = v.indices.iter().position(|&i| i == term_id("a")).unwrap();
