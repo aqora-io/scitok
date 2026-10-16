@@ -182,6 +182,51 @@ What the refinement did:
 - It never made a task worse. It also leaves a cleaner lexicon with readable names and
   auditable reasons, so the shipped domain now uses a refined `reviewed.toml`.
 
+### Discovering missed concepts
+
+A third `refine` pass, Discover, gave the model 2,000 sampled mining-period abstracts. It ran in
+batches of 25, each with the concepts the lexicon already finds in each abstract. The model
+listed the domain concepts the lexicon lacked. The same code guards as Expand applied, and
+discovered concepts were then expanded too.
+
+| step | result |
+|---|---|
+| proposals | 6,340 concepts |
+| added | 1,515 concepts with 1,737 variants; median document frequency 3 |
+| rejected variants | 4,278 in fewer than 2 mining documents, 309 already in the lexicon, 433 single words or lone acronyms |
+| expansion | 340 variants accepted, now including the discovered concepts |
+| cost | 131 requests (88 cached), 572k prompt + 307k completion tokens, 88 minutes |
+
+Most of a random sample of 30 were real concepts, for example:
+- `pauli_noise`, `quantum_trajectory`, `cornell_potential`;
+- `spin_lock_induced_crossing` (SLIC), `entangled_two_photon_absorption` (ETPA).
+
+About 1 in 10 were weak: `niobium` ← "niobium-based", "Grover-based heuristic" as `grover_search`,
+and "bipartite and tripartite entanglements".
+
+Test results (judged@10 coverage 0.992):
+
+| lexicon | agent nDCG@10 | title MRR@10 | acronym MRR@10 | acronym_hard MRR@10 |
+|---|---|---|---|---|
+| mined, recomputed `avg_len` | 0.720 | 0.896 | 0.962 | 0.773 |
+| LLM review + expand | 0.723 | 0.898 | **0.963** | **0.777** |
+| **LLM review + discover + expand** | **0.729** | **0.901** | **0.963** | 0.775 |
+
+Paired bootstrap:
+
+| comparison | agent Δ | title Δ |
+|---|---|---|
+| + discover − review + expand | **+0.006** [+0.000, +0.012] | **+0.003** [+0.001, +0.005] |
+| + discover − mined | **+0.009** [+0.002, +0.017] | **+0.004** [+0.002, +0.006] |
+| + discover − fastembed BM25 | +0.013 [−0.001, +0.027] | **+0.009** [+0.005, +0.013] |
+
+The acronym tasks did not change: −0.001 [−0.003, +0.001] and −0.002 [−0.008, +0.004]. Their
+acronym pairs were already in the lexicon. Dev agreed in direction but was smaller: agent +0.001,
+title +0.004, acronym_hard −0.002.
+
+Discovery is the first lexicon change with a clear gain on realistic queries. scitok's agent
+nDCG@10 of 0.729 now ties the best learned sparse model (opensearch-neural-sparse-v3, 0.729).
+
 ## Findings
 
 1. On realistic topical queries, tuned scitok is **statistically tied** with the best BM25
@@ -199,9 +244,11 @@ What the refinement did:
    abstracts, which likely favors lexical overlap.
 5. scitok embeds about 17× faster than fastembed BM25 on CPU. It is orders of magnitude faster than
    learned sparse or dense encoders: SPLADE++ took 70 minutes for 9k abstracts on this machine.
-6. Refining the mined lexicon with an LLM (`gpt-6.1-sol`) gives small but consistent gains: +0.001
-   to +0.005 on every task. None of them is clearly significant. The main benefit is a cleaner,
-   auditable lexicon.
+6. Reviewing and expanding the mined lexicon with an LLM (`gpt-6.1-sol`) gives small but
+   consistent gains: +0.001 to +0.005 on every task, none clearly significant. Letting the LLM
+   discover concepts the miner missed is a significant improvement on realistic queries (+0.009
+   nDCG@10 over the mined lexicon) and on title search. This brings scitok level with the best
+   learned sparse model.
 
 ## Limitations
 

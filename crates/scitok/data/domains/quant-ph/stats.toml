@@ -5,5 +5,5 @@ from = "2025-10-15"
 until = "2026-10-15"
 generated_by = "scitok-learn 0.1.0"
 docs = 13744
-avg_len = 122.4
+avg_len = 124.5
 fulltext_docs = 0

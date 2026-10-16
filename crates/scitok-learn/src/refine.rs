@@ -3,7 +3,11 @@
 //! 1. Review: every mined entry is shown to the model with its document
 //!    frequency and corpus contexts, and kept, dropped (generic phrasing) or
 //!    merged into a synonymous concept, optionally with a cleaner name.
-//! 2. Expand: curated and kept concepts get additional variants (synonyms,
+//! 2. Discover: the model lists domain concepts in a sample of abstracts that
+//!    the lexicon lacks (rare, long or low-NPMI phrases the miner cannot find).
+//!    Only multi-word concepts whose variants occur in the corpus and belong
+//!    to no other concept are added.
+//! 3. Expand: curated and kept concepts get additional variants (synonyms,
 //!    acronym/long form, spellings). Proposals are only accepted if they occur
 //!    in the corpus and do not already belong to another concept, so
 //!    hallucinated or conflicting variants never reach the lexicon.
@@ -34,11 +38,15 @@ pub struct RefineConfig {
     pub expand_batch: usize,
     /// Minimum number of documents a proposed variant must occur in.
     pub min_attested: u32,
+    /// Abstracts sampled for discovering missing concepts (0 disables it).
+    pub discover_docs: usize,
+    /// Abstracts per discovery request.
+    pub discover_batch: usize,
 }
 
 impl Default for RefineConfig {
     fn default() -> Self {
-        RefineConfig { review_batch: 40, expand_batch: 30, min_attested: 2 }
+        RefineConfig { review_batch: 40, expand_batch: 30, min_attested: 2, discover_docs: 2000, discover_batch: 25 }
     }
 }
 
@@ -145,6 +153,14 @@ pub struct RefineReport {
     pub dropped: usize,
     pub merged: usize,
     pub undecided: usize,
+    /// Concepts proposed by discovery, and the ones added with their variants.
+    pub discover_proposed: usize,
+    pub discovered: usize,
+    pub discovered_variants: usize,
+    /// Discovered variants rejected as known, unattested or too broad.
+    pub discover_known: usize,
+    pub discover_unattested: usize,
+    pub discover_too_broad: usize,
     pub proposed: usize,
     pub accepted: usize,
     pub unattested: usize,
@@ -169,7 +185,7 @@ pub fn refine<T: Transport, C: Clock>(
         let parsed: LexiconFile = toml::from_str(&src).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(parsed.term)
     };
-    if cfg.review_batch == 0 || cfg.expand_batch == 0 {
+    if cfg.review_batch == 0 || cfg.expand_batch == 0 || cfg.discover_batch == 0 {
         return Err("batch sizes must be at least 1".into());
     }
     let curated = read("curated.toml")?;
@@ -297,22 +313,46 @@ pub fn refine<T: Transport, C: Clock>(
         }
     }
 
-    // 2. expand variants of curated + kept concepts
+    // the lexicon so far; proposals matching it are duplicates or conflicts
+    // (dropped phrases are included under a placeholder name, so they cannot
+    // come back)
+    let mut existing = Lexicon::default();
+    for d in curated.iter().chain(kept.iter().map(|(d, _)| d)).chain(merged.iter().map(|(d, _)| d)) {
+        existing.add(d);
+    }
+    for (d, _) in &dropped {
+        existing.add(&TermDef { canonical: DROPPED.into(), ..d.clone() });
+    }
+
+    // 2. discover concepts the miner missed
+    let discovered = if cfg.discover_docs > 0 { discover(llm, &corpus, &existing, &taken, category, cfg, &mut report)? } else { Added::new() };
+    for ((canonical, case_sensitive), vs) in &discovered {
+        existing.add(&TermDef { canonical: canonical.clone(), variants: vs.iter().map(|(v, _)| v.clone()).collect(), case_sensitive: *case_sensitive });
+    }
+
+    // 3. expand variants of curated, kept and discovered concepts
     let mut concepts: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for d in curated.iter().chain(kept.iter().map(|(d, _)| d)).chain(merged.iter().map(|(d, _)| d)) {
         concepts.entry(d.canonical.clone()).or_default().extend(d.variants.iter().cloned());
     }
-    let names: Vec<&String> = concepts.keys().collect();
+    // discovered concepts go last, so earlier batches (and their cache entries) stay the same
+    let mut names: Vec<String> = concepts.keys().cloned().collect();
+    for ((canonical, _), vs) in &discovered {
+        if !concepts.contains_key(canonical) {
+            names.push(canonical.clone());
+        }
+        concepts.entry(canonical.clone()).or_default().extend(vs.iter().map(|(v, _)| v.clone()));
+    }
     let mut proposals: Vec<(String, String)> = Vec::new();
     for chunk in names.chunks(cfg.expand_batch) {
         let mut user = String::from("Concepts, as `canonical: existing variants`:\n");
         for c in chunk {
-            writeln!(user, "{c}: {}", concepts[*c].join("; ")).unwrap();
+            writeln!(user, "{c}: {}", concepts[c].join("; ")).unwrap();
         }
         let has_concepts = |v: &Value| v["concepts"].is_array();
-        let Some(v) = llm.json("expand", &expand_prompt(category), &user, &expand_schema(), has_concepts)? else { continue };
+        let Some(v) = llm.json("expand", &expand_prompt(category), &user, &concepts_schema(), has_concepts)? else { continue };
         for item in v["concepts"].as_array().into_iter().flatten() {
-            let Some(c) = item["canonical"].as_str().filter(|c| chunk.iter().any(|n| n.as_str() == *c)) else { continue };
+            let Some(c) = item["canonical"].as_str().filter(|c| chunk.iter().any(|n| n == c)) else { continue };
             for var in item["variants"].as_array().into_iter().flatten().filter_map(Value::as_str).take(8) {
                 proposals.push((c.to_owned(), var.trim().to_owned()));
             }
@@ -320,16 +360,6 @@ pub fn refine<T: Transport, C: Clock>(
     }
     report.proposed = proposals.len();
 
-    // existing lexicon: drop duplicates and variants that belong to another concept
-    // (dropped phrases are included under a placeholder name, so they cannot
-    // come back as variants)
-    let mut existing = Lexicon::default();
-    for d in curated.iter().chain(kept.iter().map(|(d, _)| d)).chain(merged.iter().map(|(d, _)| d)) {
-        existing.add(d);
-    }
-    for (d, _) in &dropped {
-        existing.add(&TermDef { canonical: "\u{0}dropped".into(), ..d.clone() });
-    }
     // concepts whose variants are all single words may gain single-word
     // variants (spellings); others may not, since a single ordinary word such
     // as "tomography" would replace that word everywhere
@@ -342,29 +372,16 @@ pub fn refine<T: Transport, C: Clock>(
     let mut by_key: HashMap<String, HashSet<String>> = HashMap::new();
     let mut candidates: Vec<(String, String, String)> = Vec::new();
     for (canonical, variant) in proposals {
-        let normalized = normalize(&variant);
-        let atoms: Vec<Atom> = lex(&normalized).into_iter().filter(Atom::is_term).collect();
-        if atoms.is_empty() {
-            continue;
-        }
-        match existing.longest_match(&atoms, &mut buf) {
-            Some((n, id)) if n == atoms.len() => {
-                if existing.term(id)[1..] == canonical {
-                    report.duplicates += 1;
-                } else {
-                    report.conflicting += 1;
-                }
-                continue;
+        match classify(&existing, &variant, &mut buf) {
+            None => {}
+            Some(Variant::Known(owner)) if owner == canonical => report.duplicates += 1,
+            Some(Variant::Known(_)) => report.conflicting += 1,
+            Some(Variant::New { atoms: 1, acronym: false, .. }) if !single_word_concepts.contains(&canonical) => report.too_broad += 1,
+            Some(Variant::New { key, .. }) => {
+                by_key.entry(key.clone()).or_default().insert(canonical.clone());
+                candidates.push((canonical, variant, key));
             }
-            _ => {}
         }
-        if atoms.len() == 1 && atoms[0].kind != Kind::Acronym && !single_word_concepts.contains(&canonical) {
-            report.too_broad += 1;
-            continue;
-        }
-        let key = atoms.iter().map(scitok::lexicon::key).collect::<Vec<_>>().join(" ");
-        by_key.entry(key.clone()).or_default().insert(canonical.clone());
-        candidates.push((canonical, variant, key));
     }
     // the same new variant proposed for two concepts is ambiguous
     let before = candidates.len();
@@ -378,7 +395,7 @@ pub fn refine<T: Transport, C: Clock>(
         .collect();
     let acronym_words: Vec<String> = candidates.iter().filter_map(|(_, v, _)| single_acronym(v)).collect();
     let attest = corpus.scan(&defs, 0, &acronym_words);
-    let mut added: BTreeMap<(String, bool), Vec<(String, u32)>> = BTreeMap::new();
+    let mut added = Added::new();
     let mut seen = HashSet::new();
     for (i, (canonical, variant, _)) in candidates.iter().enumerate() {
         if attest.df[i] < cfg.min_attested {
@@ -397,7 +414,7 @@ pub fn refine<T: Transport, C: Clock>(
         return Ok(report);
     }
     let dropped: Vec<(String, String)> = dropped.into_iter().map(|(d, r)| (d.canonical, r)).collect();
-    let text = reviewed_toml(category, &kept, &merged, &added, &dropped, &llm.model);
+    let text = reviewed_toml(category, &kept, &merged, &discovered, &added, &dropped, &llm.model);
     // never write a file that would fail to load (it may be compiled into the library)
     let domain = scitok::Domain::from_sources(category, read_text(out, "curated.toml").as_deref(), Some(&text), None, None)
         .map_err(|e| format!("generated reviewed.toml does not load: {e}"))?;
@@ -420,6 +437,120 @@ pub fn refine<T: Transport, C: Clock>(
 
 fn read_text(dir: &Path, file: &str) -> Option<String> {
     fs::read_to_string(dir.join(file)).ok()
+}
+
+/// Placeholder canonical for dropped phrases in the lexicon of known terms.
+const DROPPED: &str = "\u{0}dropped";
+
+/// Variants added per (canonical, case_sensitive), with their document frequency.
+type Added = BTreeMap<(String, bool), Vec<(String, u32)>>;
+
+enum Variant {
+    /// Already a variant of this concept.
+    Known(String),
+    New { key: String, atoms: usize, acronym: bool },
+}
+
+fn classify(existing: &Lexicon, variant: &str, buf: &mut String) -> Option<Variant> {
+    let normalized = normalize(variant);
+    let atoms: Vec<Atom> = lex(&normalized).into_iter().filter(Atom::is_term).collect();
+    if atoms.is_empty() {
+        return None;
+    }
+    if let Some((n, id)) = existing.longest_match(&atoms, buf)
+        && n == atoms.len()
+    {
+        return Some(Variant::Known(existing.term(id)[1..].to_owned()));
+    }
+    let key = atoms.iter().map(scitok::lexicon::key).collect::<Vec<_>>().join(" ");
+    Some(Variant::New { key, atoms: atoms.len(), acronym: atoms.len() == 1 && atoms[0].kind == Kind::Acronym })
+}
+
+/// Ask for domain concepts in a sample of abstracts that the lexicon lacks.
+/// Variants proposed under several names go to the most frequent one; a
+/// concept is added if it keeps an attested multi-word variant.
+fn discover<T: Transport, C: Clock>(
+    llm: &mut Llm<T, C>,
+    corpus: &Corpus,
+    existing: &Lexicon,
+    taken: &HashSet<String>,
+    category: &str,
+    cfg: &RefineConfig,
+    report: &mut RefineReport,
+) -> Result<Added, String> {
+    // a deterministic sample: the documents with the smallest hashes
+    let mut sample: Vec<usize> = (0..corpus.docs.len()).collect();
+    sample.sort_by_key(|&i| fnv1a(&[&corpus.docs[i]]));
+    sample.truncate(cfg.discover_docs);
+    let mut buf = String::new();
+    // key -> proposed canonical -> votes, and the key's first surface form
+    let mut votes: BTreeMap<String, BTreeMap<String, u32>> = BTreeMap::new();
+    let mut surface: HashMap<String, String> = HashMap::new();
+    for chunk in sample.chunks(cfg.discover_batch) {
+        let mut user = String::new();
+        for (k, &i) in chunk.iter().enumerate() {
+            let known = corpus.concepts(&corpus.docs[i], existing);
+            let known = if known.is_empty() { "-".to_owned() } else { known.join("; ") };
+            writeln!(user, "Abstract {k}:\n{}\nAlready in the lexicon: {known}\n", corpus.docs[i]).unwrap();
+        }
+        let has_concepts = |v: &Value| v["concepts"].is_array();
+        let Some(v) = llm.json("discover", &discover_prompt(category), &user, &concepts_schema(), has_concepts)? else { continue };
+        for item in v["concepts"].as_array().into_iter().flatten() {
+            let canonical = snake_case(item["canonical"].as_str().unwrap_or_default());
+            if canonical.is_empty() {
+                continue;
+            }
+            report.discover_proposed += 1;
+            for var in item["variants"].as_array().into_iter().flatten().filter_map(Value::as_str).take(8) {
+                match classify(existing, var, &mut buf) {
+                    None => {}
+                    Some(Variant::Known(_)) => report.discover_known += 1,
+                    Some(Variant::New { atoms: 1, acronym: false, .. }) => report.discover_too_broad += 1,
+                    Some(Variant::New { key, .. }) => {
+                        *votes.entry(key.clone()).or_default().entry(canonical.clone()).or_default() += 1;
+                        surface.entry(key).or_insert_with(|| var.trim().to_owned());
+                    }
+                }
+            }
+        }
+    }
+
+    // canonical -> (variant, key); names of existing concepts are not reused
+    let mut concepts: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (key, names) in &votes {
+        let best = names.iter().max_by(|a, b| a.1.cmp(b.1).then(b.0.cmp(a.0))).unwrap().0;
+        if taken.contains(best) {
+            report.discover_known += 1;
+        } else {
+            concepts.entry(best.clone()).or_default().push(surface[key].clone());
+        }
+    }
+    let variants: Vec<&String> = concepts.values().flatten().collect();
+    let defs: Vec<TermDef> = variants
+        .iter()
+        .map(|v| TermDef { canonical: String::new(), variants: vec![v.to_string()], case_sensitive: single_acronym(v).is_some() })
+        .collect();
+    let acronym_words: Vec<String> = variants.iter().filter_map(|v| single_acronym(v)).collect();
+    let attest = corpus.scan(&defs, 0, &acronym_words);
+    let df: HashMap<&String, u32> = variants.iter().copied().zip(attest.df.iter().copied()).collect();
+
+    let mut added = Added::new();
+    for (canonical, vs) in &concepts {
+        let attested: Vec<&String> = vs.iter().filter(|v| df[v] >= cfg.min_attested).collect();
+        report.discover_unattested += vs.len() - attested.len();
+        // an acronym alone only renames a word
+        if !attested.iter().any(|v| single_acronym(v).is_none()) {
+            report.discover_too_broad += attested.len();
+            continue;
+        }
+        report.discovered += 1;
+        report.discovered_variants += attested.len();
+        for v in attested {
+            let case_sensitive = single_acronym(v).is_some_and(|w| attest.word_counts.get(&w).copied().unwrap_or(0) >= cfg.min_attested);
+            added.entry((canonical.clone(), case_sensitive)).or_default().push((v.clone(), df[v]));
+        }
+    }
+    Ok(added)
 }
 
 #[derive(Clone)]
@@ -475,7 +606,19 @@ fn expand_prompt(category: &str) -> String {
     )
 }
 
-fn expand_schema() -> Value {
+fn discover_prompt(category: &str) -> String {
+    format!(
+        "You build a search lexicon for arXiv {category} papers. From each abstract below, list the domain-specific \
+         concepts a researcher might search for that are missing from its 'Already in the lexicon' list: named \
+         methods, algorithms, protocols, theorems, inequalities, models, codes, devices, materials and phenomena, \
+         with their acronyms. Skip generic scientific phrasing (e.g. 'numerical simulation', 'experimental \
+         results'), single ordinary words, and names coined for a single paper. For each concept give a canonical \
+         name (lowercase snake_case, singular) and its variants exactly as written in the abstract, including both \
+         the acronym and its long form when the abstract gives both. Return an empty list if nothing qualifies."
+    )
+}
+
+fn concepts_schema() -> Value {
     json!({
         "type": "object", "additionalProperties": false, "required": ["concepts"],
         "properties": {"concepts": {"type": "array", "items": {
@@ -525,6 +668,22 @@ impl Corpus {
         Corpus { docs, tok: Tokenizer::new(Config { domains: vec![], ..Config::default() }) }
     }
 
+    /// Names of the lexicon's concepts that occur in `doc` (dropped phrases excluded).
+    fn concepts(&self, doc: &str, lexicon: &Lexicon) -> Vec<String> {
+        let mut found = std::collections::BTreeSet::new();
+        let mut buf = String::new();
+        self.tok.with_atoms(doc, Input::Auto, |atoms| {
+            for i in 0..atoms.len() {
+                if let Some((_, id)) = lexicon.longest_match(&atoms[i..], &mut buf)
+                    && lexicon.term(id)[1..] != *DROPPED
+                {
+                    found.insert(lexicon.term(id)[1..].to_owned());
+                }
+            }
+        });
+        found.into_iter().collect()
+    }
+
     /// Document frequency and up to `max_snippets` contexts per definition.
     fn scan(&self, defs: &[TermDef], max_snippets: usize, words: &[String]) -> Occurrences {
         let mut lexicon = Lexicon::default();
@@ -562,7 +721,8 @@ fn reviewed_toml(
     category: &str,
     kept: &[(TermDef, String)],
     merged: &[(TermDef, String)],
-    added: &BTreeMap<(String, bool), Vec<(String, u32)>>,
+    discovered: &Added,
+    added: &Added,
     dropped: &[(String, String)],
     model: &str,
 ) -> String {
@@ -588,17 +748,20 @@ fn reviewed_toml(
     };
     section("Reviewed mined terms", kept, &mut out);
     section("Merged into other concepts", merged, &mut out);
-    let expansions: Vec<(TermDef, String)> = added
-        .iter()
-        .map(|((canonical, cs), vs)| {
-            let note = vs.iter().map(|(v, df)| format!("{v} df={df}")).collect::<Vec<_>>().join("; ");
-            (
-                TermDef { canonical: canonical.clone(), variants: vs.iter().map(|(v, _)| v.clone()).collect(), case_sensitive: *cs },
-                format!("llm: expand, {note}"),
-            )
-        })
-        .collect();
-    section("Added variants", &expansions, &mut out);
+    let defs = |added: &Added, label: &str| -> Vec<(TermDef, String)> {
+        added
+            .iter()
+            .map(|((canonical, cs), vs)| {
+                let note = vs.iter().map(|(v, df)| format!("{v} df={df}")).collect::<Vec<_>>().join("; ");
+                (
+                    TermDef { canonical: canonical.clone(), variants: vs.iter().map(|(v, _)| v.clone()).collect(), case_sensitive: *cs },
+                    format!("llm: {label}, {note}"),
+                )
+            })
+            .collect()
+    };
+    section("Discovered concepts", &defs(discovered, "discover"), &mut out);
+    section("Added variants", &defs(added, "expand"), &mut out);
     if !dropped.is_empty() {
         write!(out, "\n# --- Dropped ({}) ---\n", dropped.len()).unwrap();
         for (c, reason) in dropped {
@@ -616,6 +779,10 @@ mod tests {
     use crate::http::testing::{FakeClock, FakeTransport};
     use chrono::NaiveDate;
     use std::time::Duration;
+
+    fn no_discovery() -> RefineConfig {
+        RefineConfig { discover_docs: 0, ..RefineConfig::default() }
+    }
 
     fn completion(content: &Value) -> Vec<u8> {
         json!({"choices": [{"message": {"content": content.to_string()}}], "usage": {"prompt_tokens": 10, "completion_tokens": 5}})
@@ -711,7 +878,7 @@ mod tests {
         let bodies = t.bodies.clone();
         let out = root.join("domain");
         let mut llm = llm(t, clock, root.join("llm"));
-        let report = refine(&mut llm, &cache, &filter, &out, &RefineConfig::default()).unwrap();
+        let report = refine(&mut llm, &cache, &filter, &out, &no_discovery()).unwrap();
         // one malformed and one incomplete reply were retried
         assert_eq!(bodies.borrow().len(), 4);
         assert_eq!((report.kept, report.renamed, report.dropped), (1, 1, 1));
@@ -740,8 +907,65 @@ mod tests {
         let t = FakeTransport::new(clock.clone());
         let bodies = t.bodies.clone();
         let mut llm = super::tests::llm(t, clock, root.join("llm"));
-        refine(&mut llm, &cache, &filter, &out, &RefineConfig::default()).unwrap();
+        refine(&mut llm, &cache, &filter, &out, &no_discovery()).unwrap();
         assert_eq!((bodies.borrow().len(), llm.cached), (0, 2));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn discovers_missing_concepts_with_guards() {
+        let (root, mut cache, filter) = setup("discover");
+        let texts = ["Magic state distillation (MSD) lowers the overhead.", "Magic state distillation with MSD factories.", "Shadow tomography of qubits."];
+        let records: Vec<Record> = texts
+            .iter()
+            .enumerate()
+            .map(|(i, t)| Record {
+                id: format!("2610.0001{i}"),
+                datestamp: "2026-10-01".into(),
+                categories: vec!["quant-ph".into()],
+                title: "T".into(),
+                abstract_: t.to_string(),
+                ..Record::default()
+            })
+            .collect();
+        cache.append(&records).unwrap();
+        let clock = FakeClock::new();
+        let mut t = FakeTransport::new(clock.clone());
+        t.route("/chat/completions", 200, &completion(&json!({"decisions": [
+            {"id": 0, "decision": "drop", "merge_into": null, "name": null, "reason": "generic"},
+            {"id": 1, "decision": "keep", "merge_into": null, "name": null, "reason": "model"}
+        ]})));
+        let concept = |c: &str, vs: &[&str]| json!({"canonical": c, "variants": vs});
+        t.route("/chat/completions", 200, &completion(&json!({"concepts": [
+            concept("Magic state distillation", &["magic state distillation", "MSD"]),
+            concept("msd_only", &["MSD"]),
+            concept("shadow_tomography", &["shadow tomography"]),
+            concept("spin_chain_model", &["spin chains"]),
+            concept("distillation", &["distillation"]),
+            concept("cz_gate", &["controlled phase gate"])
+        ]})));
+        t.route("/chat/completions", 200, &completion(&json!({"concepts": []})));
+        let bodies = t.bodies.clone();
+        let out = root.join("domain");
+        let mut llm = llm(t, clock, root.join("llm"));
+        let r = refine(&mut llm, &cache, &filter, &out, &RefineConfig::default()).unwrap();
+        assert_eq!(bodies.borrow().len(), 3);
+        assert_eq!((r.discover_proposed, r.discovered, r.discovered_variants), (6, 1, 2));
+        // spin chains is known, cz_gate is an existing name; shadow tomography occurs once
+        assert_eq!((r.discover_known, r.discover_unattested, r.discover_too_broad), (2, 1, 1));
+
+        let discover = String::from_utf8(bodies.borrow()[1].clone()).unwrap();
+        assert!(discover.contains("Already in the lexicon: spin_chains") && !discover.contains("dropped"), "{discover}");
+        // discovered concepts are expanded too
+        let expand = String::from_utf8(bodies.borrow()[2].clone()).unwrap();
+        assert!(expand.contains("magic_state_distillation: magic state distillation; MSD"), "{expand}");
+        let reviewed = fs::read_to_string(out.join("reviewed.toml")).unwrap();
+        assert!(reviewed.contains("# --- Discovered concepts (1) ---"), "{reviewed}");
+        assert!(reviewed.contains("canonical = \"magic_state_distillation\"\nvariants = [\"magic state distillation\", \"MSD\"]"), "{reviewed}");
+
+        let tok = Tokenizer::new(Config { domains: vec![scitok::Domain::load(&out).unwrap()], ..Config::default() });
+        assert!(tok.tokenize("MSD").contains(&"~magic_state_distillation".to_string()));
+        assert!(!tok.tokenize("shadow tomography").iter().any(|t| t.starts_with('~')));
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -765,7 +989,7 @@ mod tests {
         ]})));
         t.route("/chat/completions", 200, &completion(&json!({"concepts": []})));
         let mut llm = llm(t, clock, root.join("llm"));
-        let report = refine(&mut llm, &cache, &filter, &out, &RefineConfig::default()).unwrap();
+        let report = refine(&mut llm, &cache, &filter, &out, &no_discovery()).unwrap();
         assert_eq!((report.merged, report.kept), (2, 2));
         let reviewed = fs::read_to_string(out.join("reviewed.toml")).unwrap();
         // a -> b -> cz_gate (target normalized); the c <-> d cycle keeps both
@@ -787,7 +1011,7 @@ mod tests {
         let mut t = FakeTransport::new(clock.clone());
         t.route("/chat/completions", 401, b"{\"error\": {\"message\": \"bad key\"}}");
         let mut llm = llm(t, clock, root.join("llm"));
-        let err = refine(&mut llm, &cache, &filter, &root.join("domain"), &RefineConfig::default()).unwrap_err();
+        let err = refine(&mut llm, &cache, &filter, &root.join("domain"), &no_discovery()).unwrap_err();
         assert!(err.contains("HTTP 401") && !err.contains("sk-test"), "{err}");
         fs::remove_dir_all(root).unwrap();
     }

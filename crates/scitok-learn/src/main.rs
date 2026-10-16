@@ -143,6 +143,12 @@ struct RefineArgs {
     /// Minimum number of documents a proposed variant must occur in.
     #[arg(long, default_value_t = refine::RefineConfig::default().min_attested)]
     min_attested: u32,
+    /// Abstracts sampled to discover concepts the miner missed (0 disables it).
+    #[arg(long, default_value_t = refine::RefineConfig::default().discover_docs)]
+    discover_docs: usize,
+    /// Abstracts per discovery request.
+    #[arg(long, default_value_t = refine::RefineConfig::default().discover_batch)]
+    discover_batch: usize,
     /// API request rate.
     #[arg(long, default_value = "1/1s")]
     rate: Rate,
@@ -249,7 +255,13 @@ fn refine(common: &Common, args: &RefineArgs) -> Result<(), String> {
         prompt_tokens: 0,
         completion_tokens: 0,
     };
-    let cfg = refine::RefineConfig { review_batch: args.review_batch, expand_batch: args.expand_batch, min_attested: args.min_attested };
+    let cfg = refine::RefineConfig {
+        review_batch: args.review_batch,
+        expand_batch: args.expand_batch,
+        min_attested: args.min_attested,
+        discover_docs: args.discover_docs,
+        discover_batch: args.discover_batch,
+    };
     let r = refine::refine(&mut llm, &cache, &filter, &out, &cfg)?;
     if args.dry_run {
         eprintln!("dry run: {} API requests needed ({} cached)", llm.calls, llm.cached);
@@ -257,10 +269,12 @@ fn refine(common: &Common, args: &RefineArgs) -> Result<(), String> {
     }
     eprintln!(
         "review: {} kept ({} renamed), {} dropped, {} merged, {} undecided\n\
+         discover: {} proposed, {} added with {} variants; {} variants already known, {} not in corpus, {} too broad\n\
          expand: {} proposed, {} accepted, {} not in corpus, {} conflicting, {} already known, {} too broad\n\
          API: {} requests ({} cached), {} prompt + {} completion tokens\n\
          avg_len {} written to stats.toml; wrote {}",
         r.kept, r.renamed, r.dropped, r.merged, r.undecided,
+        r.discover_proposed, r.discovered, r.discovered_variants, r.discover_known, r.discover_unattested, r.discover_too_broad,
         r.proposed, r.accepted, r.unattested, r.conflicting, r.duplicates, r.too_broad,
         llm.calls, llm.cached, llm.prompt_tokens, llm.completion_tokens,
         r.avg_len, out.join("reviewed.toml").display()

@@ -173,16 +173,22 @@ cargo run --release -p scitok-learn -- refine --category quant-ph --from 2025-10
 cargo run --release -p scitok-learn -- refine --category quant-ph --from 2025-10-15 --until 2026-10-15
 ```
 
-Use the same date range as `build`. `refine` makes two passes over the domain with a chat model
+Use the same date range as `build`. `refine` makes three passes over the domain with a chat model
 (default `gpt-6.1-sol`; any OpenAI-compatible endpoint via `--base-url`):
 - **Review:** each mined term, shown with its document frequency and corpus snippets, is kept
   (optionally under a more readable canonical name), dropped as generic, or merged into another
   concept. Curated entries are never changed.
-- **Expand:** curated and kept concepts get other names, spellings and acronym ↔ long forms.
-  Proposals are checked in code, not trusted:
-  - a variant is kept only if it occurs in at least `--min-attested` (2) corpus documents;
-  - variants that already belong to another concept are rejected;
-  - so is a single plain word as a variant of a multi-word concept.
+- **Discover:** the model reads a sample of abstracts (`--discover-docs`, default 2,000; 0 turns it
+  off) and lists the concepts in them that the lexicon lacks. These are usually rare, long or
+  common-word phrases that the miner's thresholds miss. Only multi-word concepts are added, with
+  their acronyms.
+- **Expand:** curated, kept and discovered concepts get other names, spellings and acronym ↔ long
+  forms.
+
+Proposals from Discover and Expand are checked in code, not trusted:
+- a variant is kept only if it occurs in at least `--min-attested` (2) corpus documents;
+- variants that already belong to another concept are rejected;
+- so is a single plain word, unless every variant of the concept is a single word.
 
 The output is `reviewed.toml`, with every decision and its reason as a comment. The command also
 updates `stats.toml`. Responses are cached in `.scitok-cache/<category>/llm/`, so reruns are
@@ -195,7 +201,8 @@ mined terms. `refine` with `gpt-6.1-sol` then reviewed the mined terms:
 - 1,536 kept;
 - 84 merged into other concepts;
 - 609 dropped as generic;
-- 589 variants added.
+- 2,390 concepts discovered in 2,000 sampled abstracts, with 2,804 variants;
+- 892 variants added to existing and discovered concepts.
 
 ## Evaluation
 
@@ -211,8 +218,12 @@ test splits:
 - **Acronym detection:** on held-out annotated abstracts, scitok has the highest precision and
   strict F1 (0.931), against scispaCy (0.922) and the reference Schwartz–Hearst implementation
   (0.918).
-- **LLM-refined lexicon (`refine`):** small gains on every task (+0.001 to +0.005), none clearly
-  significant. It never hurt, and it removed a third of the mined entries as generic.
+- **LLM-refined lexicon (`refine`):**
+  - Reviewing and expanding the mined lexicon gave small gains on every task (+0.001 to +0.005),
+    none clearly significant. It never hurt, and it removed a third of the mined entries as
+    generic.
+  - Discovering missed concepts added a significant +0.009 nDCG@10 on realistic queries (0.729,
+    level with the best learned sparse model).
 
 ## Performance
 
