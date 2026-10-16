@@ -13,7 +13,8 @@ fn pair(v: SparseVector) -> Sparse {
     (v.indices, v.values)
 }
 
-/// Domain-aware tokenizer producing Qdrant sparse vectors.
+/// Domain-aware tokenizer producing Qdrant sparse vectors, and cleaned or
+/// concept-expanded text for dense embedding models.
 ///
 /// Args:
 ///     domains: built-in domain names, default ``["quant-ph"]``; ``[]`` for none.
@@ -93,6 +94,19 @@ impl PyTokenizer {
     /// ``(indices, values)`` for a search query (weight 1 per unique term).
     fn embed_query(&self, py: Python<'_>, text: &str) -> Sparse {
         py.detach(|| pair(self.inner.embed_query(text)))
+    }
+
+    /// The text as scitok tokenizes it: LaTeX converted to text (per ``input``)
+    /// and Unicode normalized.
+    fn clean(&self, py: Python<'_>, text: &str) -> String {
+        py.detach(|| self.inner.clean(text))
+    }
+
+    /// ``clean`` text with each lexicon concept's preferred name in parentheses
+    /// after its first mention: ``QAOA`` → ``QAOA (quantum approximate
+    /// optimization algorithm)``. For dense embedding models.
+    fn expand(&self, py: Python<'_>, text: &str) -> String {
+        py.detach(|| self.inner.expand(text))
     }
 
     /// In-document acronym definitions as ``[(short, long), ...]``.

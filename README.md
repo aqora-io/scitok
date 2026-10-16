@@ -68,6 +68,17 @@ best setup in the evaluation, and
 [examples/qdrant_hybrid.py](examples/qdrant_hybrid.py) shows how. Don't lowercase queries,
 because acronyms like `ETH` are case-sensitive. Re-index after upgrading scitok.
 
+scitok can also prepare text for the dense model:
+- `tok.clean(text)` returns the text scitok tokenizes: LaTeX converted to text, Unicode normalized.
+- `tok.expand(text)` adds each lexicon concept's preferred name after its first mention:
+  `QAOA for MaxCut` → `QAOA (quantum approximate optimization algorithm) for MaxCut (maximum cut)`.
+
+The example embeds documents unchanged and the query as `tok.expand(query)`.
+Results ([eval/RESULTS.md](eval/RESULTS.md#dense-input-raw-cleaned-or-expanded-text)):
+- On acronym-swapped titles, MRR rose by 0.03 for arctic-m and by 0.014 for the hybrid.
+- Realistic queries did not change.
+- Expanding documents as well added little, and `clean` alone did not help.
+
 Use `input="latex"` for full LaTeX documents. Its BM25 `avg_len` defaults to the domain's
 full-text average when that exists. Keep abstracts and full texts in separate sparse vectors.
 

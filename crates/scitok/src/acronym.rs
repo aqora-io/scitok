@@ -23,7 +23,7 @@ impl Definition {
 }
 
 /// Acronym-like: `VQE`, `qLDPC`, or letters with digits and two capitals (`TCL6`, `2BGA`).
-fn acronym_like(a: &Atom) -> bool {
+pub(crate) fn acronym_like(a: &Atom) -> bool {
     a.kind == Kind::Acronym || (a.kind == Kind::AlphaNum && a.text.chars().filter(|c| c.is_uppercase()).count() >= 2)
 }
 

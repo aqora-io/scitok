@@ -288,6 +288,31 @@ class _Specter2:
         return np.concatenate(out)
 
 
+class Rewritten:
+    """A system that sees scitok's cleaned (`text="clean"`) or concept-expanded
+    (`text="expand"`) text instead of the raw text, for documents and queries
+    (`side="both"`) or for queries only (`side="query"`)."""
+
+    def __init__(self, inner, text, input="auto", domain_paths=(str(EVAL_DOMAIN),), side="both"):
+        import scitok
+
+        tok = scitok.Tokenizer(domains=[], domain_paths=list(domain_paths), input=input)
+        self.rewrite = {"clean": tok.clean, "expand": tok.expand}[text]
+        self.inner, self.side = inner, side
+        self.name = f"{inner.name}-{text}-{_key(text, input, list(domain_paths))}"
+        if side == "both":
+            inner.name = self.name  # rewritten documents get their own cache
+        else:
+            self.name += "-query"
+
+    def fit(self, corpus_name, texts):
+        self.inner.fit(corpus_name, [self.rewrite(t) for t in texts] if self.side == "both" else texts)
+        return self
+
+    def scores(self, queries):
+        return self.inner.scores([self.rewrite(q) for q in queries])
+
+
 class Hybrid:
     """Reciprocal rank fusion of two systems (k = 60, top 1000 of each)."""
 

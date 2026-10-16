@@ -22,6 +22,7 @@ pub mod sparse;
 mod python;
 
 use std::cell::RefCell;
+use std::ops::Range;
 
 use rayon::prelude::*;
 use rust_stemmers::{Algorithm, Stemmer};
@@ -211,6 +212,61 @@ impl Tokenizer {
         if phrase { self.options.concept_weight } else { 1.0 }
     }
 
+    /// The text as scitok tokenizes it: LaTeX converted to text (per [`Input`])
+    /// and Unicode normalized.
+    pub fn clean(&self, text: &str) -> String {
+        self.prepare(text)
+    }
+
+    /// [`clean`](Self::clean) text with the preferred name of each lexicon
+    /// concept in parentheses after its first mention, for dense embedding
+    /// models: `QAOA` → `QAOA (quantum approximate optimization algorithm)`,
+    /// `Grover search` → `Grover search (Grover's algorithm)`. Concepts the
+    /// text already calls by that name, or defines as an acronym, are left alone.
+    pub fn expand(&self, text: &str) -> String {
+        let prepared = self.prepare(text);
+        let atoms = lexer::lex(&prepared);
+        let defined: Vec<Range<usize>> =
+            acronym::definitions(&atoms).into_iter().map(|d| d.long.start..d.short.end).collect();
+        // term → (first match, expand it)
+        let mut first: FxHashMap<u32, (Range<usize>, bool)> = FxHashMap::default();
+        let (mut buf, mut key) = (String::new(), String::new());
+        let mut i = 0;
+        while i < atoms.len() {
+            let Some((n, id)) = atoms[i].is_term().then(|| self.lexicon.longest_match(&atoms[i..], &mut buf)).flatten()
+            else {
+                i += 1;
+                continue;
+            };
+            let span = i..i + n;
+            key.clear();
+            for (j, atom) in atoms[span.clone()].iter().enumerate() {
+                if j > 0 {
+                    key.push(' ');
+                }
+                push_key(atom, &mut key);
+            }
+            let keep = key != self.lexicon.display(id).1 && !defined.iter().any(|d| d.start < span.end && span.start < d.end);
+            first.entry(id).or_insert((span.clone(), true)).1 &= keep;
+            i = span.end;
+        }
+        let mut inserts: Vec<(Range<usize>, u32)> =
+            first.into_iter().filter(|(_, (_, keep))| *keep).map(|(id, (span, _))| (span, id)).collect();
+        inserts.sort_by_key(|(span, _)| span.start);
+        let mut out = String::with_capacity(prepared.len() + 40 * inserts.len());
+        let mut done = 0;
+        for (span, id) in inserts {
+            let at = insertion_point(&prepared, &atoms[span.end - 1]);
+            out.push_str(&prepared[done..at]);
+            out.push_str(" (");
+            out.push_str(self.lexicon.display(id).0);
+            out.push(')');
+            done = at;
+        }
+        out.push_str(&prepared[done..]);
+        out
+    }
+
     /// In-document acronym definitions as `(short form, long form)`.
     pub fn acronym_definitions(&self, text: &str) -> Vec<(String, String)> {
         let prepared = self.prepare(text);
@@ -329,6 +385,15 @@ impl Tokenizer {
             cache.insert(lower.into(), stem.as_ref().into());
         })
     }
+}
+
+/// Where a parenthetical about `atom` goes in `text`, which `atom` borrows
+/// from: after the rest of its word (`VQE-based`, `QAOA's`), before trailing
+/// punctuation.
+fn insertion_point(text: &str, atom: &Atom) -> usize {
+    let end = atom.text.as_ptr() as usize - text.as_ptr() as usize + atom.text.len();
+    let word_end = text[end..].find(char::is_whitespace).map_or(text.len(), |n| end + n);
+    text[..word_end].trim_end_matches(['.', ',', ';', ':', '!', '?', ')', ']', '}', '"']).len().max(end)
 }
 
 fn prepare(text: &str, input: Input) -> String {

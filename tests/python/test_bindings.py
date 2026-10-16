@@ -42,6 +42,12 @@ def test_options():
     assert scitok.Tokenizer(avg_len=42.0).avg_len == 42.0
 
 
+def test_clean_and_expand(tok):
+    assert tok.clean("Grover's algorithm \\cite{grover96}").strip() == "Grover's algorithm"
+    assert tok.expand("QAOA on qubits") == "QAOA (quantum approximate optimization algorithm) on qubits"
+    assert scitok.Tokenizer(input="plain").clean("$n$ qubits") == "$n$ qubits"
+
+
 def test_term_id_matches_fastembed_convention():
     # abs(mmh3.hash("hello")) == 613153351
     assert scitok.term_id("hello") == 613153351

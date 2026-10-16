@@ -91,6 +91,9 @@ System names:
 - Baselines are listed in `systems.baselines()`.
 - `scitok:<option>=<value>,...` sets tokenizer options. `domain=<variant>` selects
   `domains/variants/<variant>`; `domain=none` uses no domain.
+- `<baseline>:text=clean|expand,input=auto|plain,domain=<variant>,side=both|query` runs a
+  baseline on scitok's `clean` or `expand` text instead of the raw text, for documents and queries
+  or for queries only. For example: `arctic-m:text=expand,side=query`.
 - `rrf:A+B` fuses two systems with reciprocal rank fusion.
 
 Results are merged into `results/<task>-<split>.json` (not versioned; the reported numbers are in

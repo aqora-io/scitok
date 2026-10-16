@@ -7,6 +7,7 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
+use crate::acronym::acronym_like;
 use crate::lexer::{Atom, Kind, lex};
 use crate::normalize::normalize;
 
@@ -40,6 +41,8 @@ struct Node {
 #[derive(Default)]
 pub struct Lexicon {
     terms: Vec<String>,
+    /// Preferred name of each term and its key, see [`Lexicon::display`].
+    display: Vec<(String, String)>,
     /// Variant keys and their prefixes, so matching costs one lookup per atom.
     nodes: FxHashMap<String, Node>,
 }
@@ -49,7 +52,8 @@ impl Lexicon {
     /// key, the first one added wins.
     pub fn add(&mut self, def: &TermDef) {
         let term = self.terms.len() as u32;
-        let mut used = false;
+        // (variant, key, acronym-free)
+        let mut display: Option<(&str, String, bool)> = None;
         for variant in &def.variants {
             let normalized = normalize(variant);
             let atoms: Vec<Atom> = lex(&normalized).into_iter().filter(Atom::is_term).collect();
@@ -63,7 +67,8 @@ impl Lexicon {
                     .map(|a| (a.kind == Kind::Acronym).then(|| singularize(a.text).to_owned()))
                     .collect::<Vec<_>>()
             });
-            let node = self.nodes.entry(keys.join(" ")).or_default();
+            let joined = keys.join(" ");
+            let node = self.nodes.entry(joined.clone()).or_default();
             if node.variants.iter().any(|v| v.surface == surface) {
                 continue;
             }
@@ -71,10 +76,14 @@ impl Lexicon {
             for n in 1..keys.len() {
                 self.nodes.entry(keys[..n].join(" ")).or_default().prefix = true;
             }
-            used = true;
+            let plain = !atoms.iter().any(acronym_like);
+            if display.as_ref().is_none_or(|d| plain && !d.2) {
+                display = Some((variant, joined, plain));
+            }
         }
-        if used {
+        if let Some((name, key, _)) = display {
             self.terms.push(format!("{CONCEPT_PREFIX}{}", def.canonical));
+            self.display.push((name.to_owned(), key));
         }
     }
 
@@ -88,6 +97,14 @@ impl Lexicon {
 
     pub fn term(&self, id: u32) -> &str {
         &self.terms[id as usize]
+    }
+
+    /// Preferred name of a term as `(text, key)`: its first variant without
+    /// an acronym (`quantum approximate optimization algorithm` for `QAOA`),
+    /// or its first variant if all have one.
+    pub fn display(&self, id: u32) -> (&str, &str) {
+        let (name, key) = &self.display[id as usize];
+        (name, key)
     }
 
     /// Does this exact key (one or more atom keys joined by spaces) map to a term?
@@ -231,6 +248,20 @@ mod tests {
         assert_eq!(find(&lx, "Eigenstate thermalization hypothesis"), Some((3, "~eth".into())));
         let lx = lexicon(&[("qaoa", &["QAOA"], false)]);
         assert_eq!(find(&lx, "qaoa"), Some((1, "~qaoa".into())));
+    }
+
+    #[test]
+    fn display_names() {
+        let lx = lexicon(&[
+            ("hhl", &["HHL", "HHL algorithm", "Harrow-Hassidim-Lloyd algorithm"], false),
+            ("cnot", &["CNOT", "CX gate"], false),
+            ("a", &["foo bar"], false),
+            ("b", &["foo bars", "baz"], false),
+        ]);
+        assert_eq!(lx.display(0), ("Harrow-Hassidim-Lloyd algorithm", "harrow hassidim lloyd algorithm"));
+        assert_eq!(lx.display(1), ("CNOT", "cnot"));
+        // `foo bars` has the key of `foo bar`, which belongs to `a`
+        assert_eq!(lx.display(3), ("baz", "baz"));
     }
 
     #[test]

@@ -1,5 +1,7 @@
 """Hybrid search over arXiv abstracts with Qdrant: scitok sparse vectors plus a dense model,
-fused with reciprocal rank fusion (the best setup in eval/RESULTS.md).
+fused with reciprocal rank fusion (the best setup in eval/RESULTS.md). Queries are expanded for
+the dense model, `QAOA` → `QAOA (quantum approximate optimization algorithm)`, which helps when a
+query and a paper name a concept differently.
 
     pip install qdrant-client fastembed scitok    # or `maturin develop` for scitok
     docker run -p 6333:6333 qdrant/qdrant
@@ -51,7 +53,7 @@ def search(client, collection, query, tok, dense, limit=10):
         collection,
         prefetch=[
             models.Prefetch(query=models.SparseVector(indices=idx, values=val), using="scitok", limit=100),
-            models.Prefetch(query=next(dense.embed([QUERY_PREFIX + query])).tolist(), using="dense", limit=100),
+            models.Prefetch(query=next(dense.embed([QUERY_PREFIX + tok.expand(query)])).tolist(), using="dense", limit=100),
         ],
         # k=61 in Qdrant is the k=60 of the RRF paper and the evaluation; Qdrant's default is 2
         query=models.RrfQuery(rrf=models.Rrf(k=61)),

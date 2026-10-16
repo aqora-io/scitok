@@ -66,6 +66,13 @@ def make(name):
                 else:
                     opts[k] = float(v)
         return systems.Scitok(**opts)
+    if ":" in name:
+        # arctic-m:text=expand,input=plain,domain=<variant>: the baseline on scitok's rewritten text
+        base, spec = name.split(":", 1)
+        opts = dict(kv.split("=") for kv in spec.split(","))
+        if "domain" in opts:
+            opts["domain_paths"] = (str(systems.ROOT / "domains" / "variants" / opts.pop("domain")),)
+        return systems.Rewritten(systems.baselines()[base](), **opts)
     return systems.baselines()[name]()
 
 

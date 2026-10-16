@@ -172,6 +172,8 @@ fn random_inputs_never_panic() {
         }
         tok.embed_document(&s);
         latex.embed_document(&s);
+        tok.expand(&s);
+        latex.expand(&s);
     }
 }
 
@@ -198,4 +200,45 @@ fn acronym_definitions_api() {
         tok().acronym_definitions("noisy intermediate-scale quantum (NISQ) devices"),
         vec![("NISQ".to_string(), "noisy intermediate-scale quantum".to_string())]
     );
+}
+
+#[test]
+fn clean_text() {
+    let text = "$O(\\sqrt{N})$ queries via Grover’s algorithm \\cite{grover96}";
+    assert_eq!(tok().clean(text).trim(), "queries via Grover's algorithm");
+    let plain = Tokenizer::new(Config { input: Input::Plain, ..Config::default() });
+    assert_eq!(plain.clean(text), "$O(\\sqrt{N})$ queries via Grover's algorithm \\cite{grover96}");
+}
+
+#[test]
+fn expand_names_concepts_once() {
+    let expand = |text: &str| tok().expand(text);
+    assert_eq!(
+        expand("QAOA for MaxCut"),
+        "QAOA (quantum approximate optimization algorithm) for MaxCut (maximum cut)"
+    );
+    assert_eq!(expand("qaoa"), "qaoa (quantum approximate optimization algorithm)");
+    assert_eq!(expand("ETH in spin chains"), "ETH (eigenstate thermalization hypothesis) in spin chains");
+    assert_eq!(expand("eth in spin chains"), "eth in spin chains");
+    assert_eq!(expand("Grover search on qubits"), "Grover search (Grover's algorithm) on qubits");
+    assert_eq!(expand("VQE and VQE"), "VQE (variational quantum eigensolver) and VQE");
+    assert_eq!(
+        expand("VQE-based ansatz, QAOA's depth"),
+        "VQE-based (variational quantum eigensolver) ansatz, QAOA's (quantum approximate optimization algorithm) depth"
+    );
+    assert_eq!(expand("with NISQ."), "with NISQ (noisy intermediate-scale quantum).");
+}
+
+#[test]
+fn expand_leaves_named_and_defined_concepts() {
+    let tok = tok();
+    for text in [
+        "Lieb-Robinson bounds",
+        "the quantum approximate optimization algorithm. QAOA works",
+        "the quantum approximate optimisation algorithm (QAOA) works",
+    ] {
+        assert_eq!(tok.expand(text), text);
+    }
+    let bare = Tokenizer::new(Config { domains: vec![], ..Config::default() });
+    assert_eq!(bare.expand("QAOA on $n$ qubits"), bare.clean("QAOA on $n$ qubits"));
 }

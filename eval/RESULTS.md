@@ -227,6 +227,79 @@ title +0.004, acronym_hard −0.002.
 Discovery is the first lexicon change with a clear gain on realistic queries. scitok's agent
 nDCG@10 of 0.729 now ties the best learned sparse model (opensearch-neural-sparse-v3, 0.729).
 
+## Dense input: raw, cleaned or expanded text
+
+scitok can rewrite the text a dense model embeds:
+- `clean`: LaTeX converted to text, with math dropped, and Unicode normalized.
+- `expand`: cleaned text with each lexicon concept's preferred name in parentheses after its first
+  mention, e.g. `QAOA (quantum approximate optimization algorithm)`. Concepts that the text
+  already calls by that name, or defines as an acronym, are left alone.
+- `expand` with `input="plain"`: the same, but the LaTeX, math included, is kept.
+
+Setup:
+- arctic-m embedded each variant, for documents and queries alike, and also for queries only.
+  Queries-only keeps the raw document embeddings.
+- Expansion used the tuned eval lexicon, so there is no leakage, or its LLM-refined version
+  (review + discover + expand).
+- The sparse half of every hybrid is tuned scitok.
+- About a third of the abstracts get at least one insertion. Of the queries, 2–3% contain LaTeX.
+
+Realistic queries, nDCG@10, as arctic-m alone / RRF with scitok:
+
+| dense input | dev (n = 150) | test (n = 170) |
+|---|---|---|
+| raw | 0.712 / 0.767 | 0.736 / 0.764 |
+| clean | 0.705 / 0.763 | 0.738 / 0.764 |
+| expand | 0.710 / 0.767 | 0.737 / **0.768** |
+| expand, math kept | **0.715** / 0.766 | 0.732 / 0.767 |
+| expand, LLM-refined lexicon | 0.710 / 0.765 | 0.737 / 0.767 |
+| expand, queries only | 0.714 / **0.768** | 0.735 / **0.768** |
+
+None of the variants differs significantly from raw on test (paired bootstrap). Every hybrid is
+within 0.004 of raw.
+
+The proxy tasks were run for raw and for two expansion settings:
+- **expand with math kept, on documents and queries.** It was chosen on agent dev, where it was the
+  best dense-only system.
+- **expand on queries only**, which needs no document re-encoding.
+
+Results are MRR@10 on test, with dev in parentheses:
+
+| system | acronym | acronym_hard | title |
+|---|---|---|---|
+| arctic-m, raw | 0.947 (0.945) | 0.832 (0.821) | 0.936 (0.938) |
+| arctic-m, expand documents + queries | 0.950 (0.940) | **0.864** (0.862) | 0.934 (0.937) |
+| arctic-m, expand queries only | 0.949 (0.945) | 0.859 (0.854) | 0.933 (0.935) |
+| RRF, raw | 0.965 (0.973) | 0.838 (0.842) | 0.932 (0.930) |
+| RRF, expand documents + queries | 0.964 (0.969) | 0.848 (0.853) | 0.931 (0.930) |
+| RRF, expand queries only | 0.965 (0.970) | **0.852** (0.853) | 0.931 (0.930) |
+
+Paired bootstrap on acronym_hard, expand − raw:
+
+| system | dev | test |
+|---|---|---|
+| arctic-m, documents + queries | **+0.041** [+0.024, +0.059] | **+0.032** [+0.017, +0.048] |
+| arctic-m, queries only | **+0.032** [+0.016, +0.050] | **+0.027** [+0.013, +0.042] |
+| RRF, documents + queries | +0.011 [−0.003, +0.024] | +0.009 [−0.003, +0.022] |
+| RRF, queries only | +0.011 [−0.001, +0.023] | **+0.014** [+0.003, +0.026] |
+
+On acronym the differences are within ±0.005 and every CI includes 0. On title they are within
+0.003.
+
+Conclusions:
+- Expansion helps where a query and a paper name a concept differently and the paper never spells
+  out the query's form. arctic-m gains 0.03–0.04 MRR there.
+- Expanding only the queries keeps most of that gain for arctic-m. In the hybrid it does at least
+  as well as expanding documents too: +0.014 on test, the only significant hybrid gain.
+- The hybrid gains less than arctic-m alone, because scitok's sparse side already bridges those
+  pairs.
+- Elsewhere, expansion is neutral.
+- Dropping math does not help.
+- The LLM-refined lexicon performs the same as the mined one.
+
+[examples/qdrant_hybrid.py](../examples/qdrant_hybrid.py) expands only the queries for the dense
+model.
+
 ## Findings
 
 1. On realistic topical queries, tuned scitok is **statistically tied** with the best BM25
@@ -249,6 +322,10 @@ nDCG@10 of 0.729 now ties the best learned sparse model (opensearch-neural-spars
    discover concepts the miner missed is a significant improvement on realistic queries (+0.009
    nDCG@10 over the mined lexicon) and on title search. This brings scitok level with the best
    learned sparse model.
+7. Expanding queries with scitok before the dense model sees them (`tok.expand(query)`)
+   improves retrieval on acronym-swapped titles: +0.027 MRR for arctic-m on test and +0.014 in
+   the hybrid. Expanding documents as well adds little. Other tasks do not change, and converting
+   LaTeX to text alone does not help.
 
 ## Limitations
 
@@ -257,8 +334,9 @@ nDCG@10 of 0.729 now ties the best learned sparse model (opensearch-neural-spars
 - Systems that were not in the judging pool (SPECTER2, BGE-M3, Qwen3-Embedding) are still
   encoding on CPU and are not reported. When they are added, unjudged documents count as
   non-relevant, which slightly disadvantages them.
-- Proxy tasks are reported for lexical systems only. Dense and learned-sparse encodings of the
-  abstract-only corpus were still running.
+- Proxy tasks are reported for lexical systems, and for arctic-m in
+  [Dense input](#dense-input-raw-cleaned-or-expanded-text). The other dense and learned-sparse
+  encodings of the abstract-only corpus were still running.
 - 170 test queries resolve differences of about 0.02 nDCG; smaller differences are noise.
 - The shipped built-in domain is mined (and LLM-refined) from 12 months, including the evaluation
   period. It was not evaluated, to avoid leakage.
