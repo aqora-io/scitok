@@ -5,7 +5,9 @@ use rustc_hash::FxHashMap;
 /// A Qdrant sparse vector: sorted unique `indices` with their `values`.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SparseVector {
+    /// Term ids, see [`term_id`].
     pub indices: Vec<u32>,
+    /// One value per index.
     pub values: Vec<f32>,
 }
 
@@ -15,7 +17,14 @@ pub struct SparseVector {
 pub enum Weighting {
     /// BM25 term-frequency saturation; `avg_len` defaults to the domain's
     /// average document length.
-    Bm25 { k1: f32, b: f32, avg_len: Option<f32> },
+    Bm25 {
+        /// Term-frequency saturation.
+        k1: f32,
+        /// Document-length normalization.
+        b: f32,
+        /// Average document length.
+        avg_len: Option<f32>,
+    },
     /// Raw term counts.
     Tf,
 }

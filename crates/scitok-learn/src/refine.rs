@@ -26,11 +26,11 @@ use scitok::domain::{FORMAT_VERSION, LexiconFile};
 use scitok::lexer::{Atom, Kind, lex};
 use scitok::lexicon::{Lexicon, TermDef};
 use scitok::normalize::normalize;
-use scitok::{Config, Input, Tokenizer};
+use scitok::{Input, Tokenizer};
 
 use crate::cache::Cache;
 use crate::http::{Client, Clock, Transport};
-use crate::learn::document;
+use crate::learn::{document, tokenizer};
 use crate::oai::Filter;
 
 pub struct RefineConfig {
@@ -422,7 +422,7 @@ pub fn refine<T: Transport, C: Clock>(
     fs::write(&path, &text).map_err(|e| format!("{}: {e}", path.display()))?;
 
     // BM25 average length changes with the lexicon
-    let tok = Tokenizer::new(Config { domains: vec![domain], ..Config::default() });
+    let tok = tokenizer(vec![domain]);
     let total: usize = corpus.docs.iter().map(|d| tok.len_as(d, Input::Auto)).sum();
     report.avg_len = (total as f32 / corpus.docs.len() as f32 * 10.0).round() / 10.0;
     let stats_path = out.join("stats.toml");
@@ -665,7 +665,7 @@ struct Occurrences {
 
 impl Corpus {
     fn new(docs: Vec<String>) -> Self {
-        Corpus { docs, tok: Tokenizer::new(Config { domains: vec![], ..Config::default() }) }
+        Corpus { docs, tok: tokenizer(vec![]) }
     }
 
     /// Names of the lexicon's concepts that occur in `doc` (dropped phrases excluded).
@@ -898,7 +898,7 @@ mod tests {
 
         // the domain now maps both gate spellings to one concept
         let domain = scitok::Domain::load(&out).unwrap();
-        let tok = Tokenizer::new(Config { domains: vec![domain], ..Config::default() });
+        let tok = tokenizer(vec![domain]);
         assert!(tok.tokenize("a controlled-phase gate").contains(&"~cz_gate".to_string()));
         assert!(!tok.tokenize("good agreement").iter().any(|t| t.starts_with('~')));
 
@@ -963,7 +963,7 @@ mod tests {
         assert!(reviewed.contains("# --- Discovered concepts (1) ---"), "{reviewed}");
         assert!(reviewed.contains("canonical = \"magic_state_distillation\"\nvariants = [\"magic state distillation\", \"MSD\"]"), "{reviewed}");
 
-        let tok = Tokenizer::new(Config { domains: vec![scitok::Domain::load(&out).unwrap()], ..Config::default() });
+        let tok = tokenizer(vec![scitok::Domain::load(&out).unwrap()]);
         assert!(tok.tokenize("MSD").contains(&"~magic_state_distillation".to_string()));
         assert!(!tok.tokenize("shadow tomography").iter().any(|t| t.starts_with('~')));
         fs::remove_dir_all(root).unwrap();

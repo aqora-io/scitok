@@ -21,8 +21,9 @@ pub const FORMAT_VERSION: u32 = 1;
 
 include!(concat!(env!("OUT_DIR"), "/builtin_domains.rs"));
 
+/// A domain that could not be loaded.
 #[derive(Debug)]
-pub struct Error(pub String);
+pub struct Error(#[doc(hidden)] pub String);
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -39,12 +40,18 @@ pub struct LexiconFile {
     pub term: Vec<TermDef>,
 }
 
+/// Corpus statistics of a domain (`stats.toml`), written by `scitok-learn`.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct Stats {
+    /// Domain file format version.
     pub version: u32,
+    /// arXiv category of the corpus.
     pub category: String,
+    /// Papers first submitted on or after this date (`YYYY-MM-DD`).
     pub from: String,
+    /// Papers first submitted on or before this date (`YYYY-MM-DD`).
     pub until: String,
+    /// Tool and version that wrote the file.
     pub generated_by: String,
     /// Number of abstracts (title + abstract) in the corpus.
     pub docs: usize,
@@ -56,12 +63,18 @@ pub struct Stats {
     pub avg_len_fulltext: Option<f32>,
 }
 
+/// Lexicon, stopwords and corpus statistics for one arXiv category.
 #[derive(Clone, Debug, Default)]
 pub struct Domain {
+    /// Category name, e.g. `quant-ph`.
     pub name: String,
+    /// Hand-written lexicon (`curated.toml`).
     pub curated: Vec<TermDef>,
+    /// Generated lexicon (`reviewed.toml`, or `mined.toml` without it).
     pub mined: Vec<TermDef>,
+    /// Extra stopwords (`stopwords.txt`), lowercase.
     pub stopwords: Vec<String>,
+    /// Corpus statistics (`stats.toml`).
     pub stats: Option<Stats>,
 }
 
@@ -75,6 +88,7 @@ impl Domain {
         Domain::from_sources(name, *curated, reviewed.or(*mined), *stats, *stopwords)
     }
 
+    /// Names of the built-in domains.
     pub fn builtin_names() -> Vec<&'static str> {
         BUILTIN.iter().map(|(n, _)| *n).collect()
     }
@@ -103,6 +117,7 @@ impl Domain {
         )
     }
 
+    /// Parse a domain from the contents of its files.
     pub fn from_sources(
         name: &str,
         curated: Option<&str>,

@@ -26,7 +26,9 @@ fn main() {
         for file in FILES {
             let path = dir.path().join(file);
             println!("cargo:rerun-if-changed={}", path.display());
-            if path.exists() {
+            // `reviewed.toml` replaces `mined.toml`, so don't compile in both
+            let replaced = file == "mined.toml" && dir.path().join("reviewed.toml").exists();
+            if path.exists() && !replaced {
                 write!(code, "Some(include_str!({:?})), ", path.display().to_string()).unwrap();
             } else {
                 code.push_str("None, ");

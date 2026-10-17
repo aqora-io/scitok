@@ -14,9 +14,13 @@ use crate::normalize::normalize;
 /// Prefix marking concept terms so they never collide with unigrams.
 pub const CONCEPT_PREFIX: char = '~';
 
+/// A lexicon entry: one concept and the spellings that map to it.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct TermDef {
+    /// Emitted as the term `~canonical`.
     pub canonical: String,
+    /// Names of the concept. Matched case-insensitively, ignoring plurals,
+    /// possessives and hyphen/space differences.
     pub variants: Vec<String>,
     /// Acronyms in the variants (`ETH`) must match with exact letter case, for
     /// acronyms that are also English words. Other words stay case-insensitive.

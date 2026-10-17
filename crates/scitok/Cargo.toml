@@ -3,7 +3,13 @@ name = "scitok"
 description = "Domain-aware tokenizer producing Qdrant sparse vectors for scientific papers"
 version.workspace = true
 edition.workspace = true
+rust-version = "1.88"
 license.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+keywords = ["tokenizer", "bm25", "qdrant", "sparse-vectors", "arxiv"]
+categories = ["text-processing", "science"]
+exclude = ["data/domains/*/stopword_candidates.txt"]
 
 [lib]
 name = "scitok"

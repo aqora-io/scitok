@@ -2,21 +2,32 @@
 //! Qdrant collections configured with `modifier: idf`.
 //!
 //! ```
+//! # #[cfg(feature = "domain-quant-ph")] {
 //! use scitok::{Config, Tokenizer};
 //! let tok = Tokenizer::new(Config::default());
 //! let terms = tok.tokenize("We run the quantum approximate optimization algorithm (QAOA).");
 //! assert!(terms.contains(&"~qaoa".to_string()));
 //! let doc = tok.embed_document("Grover's algorithm on a surface code");
 //! assert_eq!(doc.indices.len(), doc.values.len());
+//! # }
 //! ```
 
+// Internals, public for `scitok-learn` and not covered by semver.
+#[doc(hidden)]
 pub mod acronym;
+#[doc(hidden)]
 pub mod domain;
+#[doc(hidden)]
 pub mod latex;
+#[doc(hidden)]
 pub mod lexer;
+#[doc(hidden)]
 pub mod lexicon;
+#[doc(hidden)]
 pub mod mine;
+#[doc(hidden)]
 pub mod normalize;
+#[doc(hidden)]
 pub mod sparse;
 #[cfg(feature = "python")]
 mod python;
@@ -41,28 +52,37 @@ const COMMON_STOPWORDS: &str = include_str!("../data/common/stopwords.txt");
 /// domain statistics provide one.
 pub const FALLBACK_AVG_LEN: f32 = 120.0;
 
+/// How input text is read.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Input {
     /// LaTeX pre-pass when the text contains `$` or `\`, plain otherwise.
     #[default]
     Auto,
+    /// Plain text, without the LaTeX pre-pass.
     Plain,
     /// A full LaTeX document (preamble and bibliography are dropped).
     Latex,
 }
 
+/// Tokenizer settings. Start from [`Config::default`] (the built-in domains
+/// enabled by cargo features, BM25, tuned [`Options`]) and change its fields.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Config {
     /// Merged in order: curated entries of all domains first, then mined
     /// entries; on conflicting variants the earlier domain wins.
     pub domains: Vec<Domain>,
+    /// How texts are read.
     pub input: Input,
+    /// How document term frequencies become vector values.
     pub weighting: Weighting,
+    /// Pipeline switches.
     pub options: Options,
 }
 
 /// Which parts of the pipeline emit terms (mostly for evaluation/ablation).
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Options {
     /// Emit `~concept` terms for lexicon matches.
     pub concepts: bool,
@@ -105,6 +125,8 @@ impl Default for Config {
     }
 }
 
+/// Turns text into terms and Qdrant sparse vectors. Construction merges the
+/// domain lexicons, so build one and reuse it.
 pub struct Tokenizer {
     lexicon: Lexicon,
     stopwords: FxHashSet<String>,
@@ -116,6 +138,7 @@ pub struct Tokenizer {
 }
 
 impl Tokenizer {
+    /// Build a tokenizer from `config`.
     pub fn new(config: Config) -> Tokenizer {
         let mut lexicon = Lexicon::default();
         for def in config.domains.iter().flat_map(|d| &d.curated) {
@@ -154,6 +177,7 @@ impl Tokenizer {
         self.lexicon.len()
     }
 
+    #[doc(hidden)]
     pub fn is_stopword(&self, lowercase: &str) -> bool {
         self.stopwords.contains(lowercase)
     }
@@ -186,17 +210,20 @@ impl Tokenizer {
 
     /// Run `f` on the atoms of `text` before acronym expansion and lexicon
     /// matching (used for corpus mining).
+    #[doc(hidden)]
     pub fn with_atoms<R>(&self, text: &str, input: Input, f: impl FnOnce(&[Atom]) -> R) -> R {
         let prepared = prepare(text, input);
         f(&lexer::lex(&prepared))
     }
 
     /// Does the lexicon already cover this exact key (atom keys joined by spaces)?
+    #[doc(hidden)]
     pub fn lexicon_contains(&self, key: &str) -> bool {
         self.lexicon.contains_key(key)
     }
 
     /// Count of terms emitted for `text` in the given input mode.
+    #[doc(hidden)]
     pub fn len_as(&self, text: &str, input: Input) -> usize {
         let prepared = prepare(text, input);
         let mut n = 0;

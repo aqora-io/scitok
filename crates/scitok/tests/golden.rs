@@ -1,7 +1,15 @@
+#![cfg(feature = "domain-quant-ph")]
+
 use scitok::{Config, Domain, Input, TermDef, Tokenizer, Weighting, term_id};
 
 fn tok() -> Tokenizer {
     Tokenizer::new(Config::default())
+}
+
+fn tok_with(set: impl FnOnce(&mut Config)) -> Tokenizer {
+    let mut config = Config::default();
+    set(&mut config);
+    Tokenizer::new(config)
 }
 
 fn terms(text: &str) -> Vec<String> {
@@ -48,10 +56,7 @@ fn eponyms_and_hyphens() {
     assert_eq!(terms("Lieb-Robinson bound"), t);
     assert_eq!(terms("Lieb Robinson bound"), t);
     // joined compounds are opt-in
-    let with_compounds = Tokenizer::new(Config {
-        options: scitok::Options { compounds: true, ..Default::default() },
-        ..Config::default()
-    });
+    let with_compounds = tok_with(|cfg| cfg.options.compounds = true);
     assert!(with_compounds.tokenize("two-qubit gates").contains(&"twoqubit".to_string()));
     assert!(with_compounds.tokenize("non-local").contains(&"nonloc".to_string()));
 }
@@ -94,7 +99,7 @@ fn query_values_are_one_per_unique_term() {
 
 #[test]
 fn tf_weighting_counts_terms() {
-    let tok = Tokenizer::new(Config { weighting: Weighting::Tf, ..Config::default() });
+    let tok = tok_with(|cfg| cfg.weighting = Weighting::Tf);
     let v = tok.embed_document("qubit qubit transmon");
     let qubit = v.indices.iter().position(|&i| i == term_id("qubit")).unwrap();
     assert_eq!(v.values[qubit], 2.0);
@@ -102,7 +107,7 @@ fn tf_weighting_counts_terms() {
 
 #[test]
 fn full_latex_documents() {
-    let tok = Tokenizer::new(Config { input: Input::Latex, ..Config::default() });
+    let tok = tok_with(|cfg| cfg.input = Input::Latex);
     let doc = r"\documentclass{article}
 \title{Benchmarking \emph{surface codes}}
 \begin{document}
@@ -119,7 +124,7 @@ We study the toric code~\cite{kitaev}. See Eq.~\eqref{eq:H}.
 
 #[test]
 fn domains_change_concepts() {
-    let none = Tokenizer::new(Config { domains: vec![], ..Config::default() });
+    let none = tok_with(|cfg| cfg.domains.clear());
     assert!(!none.tokenize("QAOA").iter().any(|t| t.starts_with('~')));
     assert_eq!(none.tokenize("QAOA"), vec!["qaoa"]);
     assert!(has("QAOA", "~qaoa"));
@@ -139,7 +144,7 @@ fn curated_beats_mined_and_first_domain_wins() {
         ..Domain::default()
     };
     let c = Domain { name: "c".into(), curated: vec![def("c_gadget", "gadget")], ..Domain::default() };
-    let tok = Tokenizer::new(Config { domains: vec![a, b, c], ..Config::default() });
+    let tok = tok_with(|cfg| cfg.domains = vec![a, b, c]);
     assert_eq!(tok.tokenize("widget gadget"), vec!["~curated_b", "~b_gadget"]);
 }
 
@@ -147,9 +152,13 @@ fn curated_beats_mined_and_first_domain_wins() {
 fn domain_stats_set_avg_len() {
     let stats = "version = 1\ncategory = \"x\"\nfrom = \"2026-01-01\"\nuntil = \"2026-06-01\"\ngenerated_by = \"test\"\ndocs = 10\navg_len = 77.5\n";
     let d = Domain::from_sources("x", None, None, Some(stats), None).unwrap();
-    assert_eq!(Tokenizer::new(Config { domains: vec![d.clone()], ..Config::default() }).avg_len(), 77.5);
+    assert_eq!(tok_with(|cfg| cfg.domains = vec![d.clone()]).avg_len(), 77.5);
     let explicit = Weighting::Bm25 { k1: 1.2, b: 0.75, avg_len: Some(10.0) };
-    assert_eq!(Tokenizer::new(Config { domains: vec![d], weighting: explicit, ..Config::default() }).avg_len(), 10.0);
+    let tok = tok_with(|cfg| {
+        cfg.domains = vec![d];
+        cfg.weighting = explicit;
+    });
+    assert_eq!(tok.avg_len(), 10.0);
 }
 
 #[test]
@@ -160,7 +169,7 @@ fn random_inputs_never_panic() {
         "\\emph", "\\\"", "\\v", "\\text{", "\\mathrm{", "SU(", "QAOA", "(VQE)", "variational quantum ", "'s",
     ];
     let tok = tok();
-    let latex = Tokenizer::new(Config { input: Input::Latex, ..Config::default() });
+    let latex = tok_with(|cfg| cfg.input = Input::Latex);
     let mut state: u64 = 0x2545_f491_4f6c_dd1d;
     for _ in 0..20_000 {
         let mut s = String::new();
@@ -180,17 +189,20 @@ fn random_inputs_never_panic() {
 #[test]
 fn options_toggle_pipeline_parts() {
     use scitok::Options;
-    let with = |options: Options| Tokenizer::new(Config { options, ..Config::default() });
+    let with = |set: fn(&mut Options)| tok_with(|cfg| set(&mut cfg.options));
     let text = "Lieb-Robinson bounds";
-    let no_concepts = with(Options { concepts: false, ..Options::default() }).tokenize(text);
+    let no_concepts = with(|o| o.concepts = false).tokenize(text);
     assert_eq!(no_concepts, vec!["lieb", "robinson", "bound"]);
-    let phrase_only = with(Options { phrase_unigrams: false, compounds: false, ..Options::default() }).tokenize(text);
-    assert_eq!(phrase_only, vec!["~lieb_robinson_bound"]);
-    assert_eq!(with(Options { stem: false, ..Options::default() }).tokenize("entangled qubits"), vec!["entangled", "qubits"]);
-    let weighted = with(Options { concept_weight: 2.0, ..Options::default() }).embed_query("QAOA surface code");
+    let phrase_only = with(|o| {
+        o.phrase_unigrams = false;
+        o.compounds = false;
+    });
+    assert_eq!(phrase_only.tokenize(text), vec!["~lieb_robinson_bound"]);
+    assert_eq!(with(|o| o.stem = false).tokenize("entangled qubits"), vec!["entangled", "qubits"]);
+    let weighted = with(|o| o.concept_weight = 2.0).embed_query("QAOA surface code");
     let value = |t: &str| weighted.values[weighted.indices.iter().position(|&i| i == term_id(t)).unwrap()];
     assert_eq!((value("~qaoa"), value("~surface_code")), (1.0, 2.0));
-    let dropped = with(Options { concept_weight: 0.0, ..Options::default() }).tokenize("QAOA surface code");
+    let dropped = with(|o| o.concept_weight = 0.0).tokenize("QAOA surface code");
     assert_eq!(dropped, vec!["~qaoa", "surfac", "code"]);
 }
 
@@ -206,7 +218,7 @@ fn acronym_definitions_api() {
 fn clean_text() {
     let text = "$O(\\sqrt{N})$ queries via Grover’s algorithm \\cite{grover96}";
     assert_eq!(tok().clean(text).trim(), "queries via Grover's algorithm");
-    let plain = Tokenizer::new(Config { input: Input::Plain, ..Config::default() });
+    let plain = tok_with(|cfg| cfg.input = Input::Plain);
     assert_eq!(plain.clean(text), "$O(\\sqrt{N})$ queries via Grover's algorithm \\cite{grover96}");
 }
 
@@ -239,6 +251,6 @@ fn expand_leaves_named_and_defined_concepts() {
     ] {
         assert_eq!(tok.expand(text), text);
     }
-    let bare = Tokenizer::new(Config { domains: vec![], ..Config::default() });
+    let bare = tok_with(|cfg| cfg.domains.clear());
     assert_eq!(bare.expand("QAOA on $n$ qubits"), bare.clean("QAOA on $n$ qubits"));
 }

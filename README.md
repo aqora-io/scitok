@@ -65,7 +65,7 @@ values tuned in the evaluation. Also available: `tok.tokenize(text)` for inspect
 
 For hybrid search, combine scitok with a dense model using Qdrant's RRF fusion. This was the
 best setup in the evaluation, and
-[examples/qdrant_hybrid.py](examples/qdrant_hybrid.py) shows how. Don't lowercase queries,
+[examples/qdrant_hybrid.py](https://github.com/aqora-io/scitok/blob/main/examples/qdrant_hybrid.py) shows how. Don't lowercase queries,
 because acronyms like `ETH` are case-sensitive. Re-index after upgrading scitok.
 
 scitok can also prepare text for the dense model:
@@ -74,7 +74,7 @@ scitok can also prepare text for the dense model:
   `QAOA for MaxCut` → `QAOA (quantum approximate optimization algorithm) for MaxCut (maximum cut)`.
 
 The example embeds documents unchanged and the query as `tok.expand(query)`.
-Results ([eval/RESULTS.md](eval/RESULTS.md#dense-input-raw-cleaned-or-expanded-text)):
+Results ([eval/RESULTS.md](https://github.com/aqora-io/scitok/blob/main/eval/RESULTS.md#dense-input-raw-cleaned-or-expanded-text)):
 - On acronym-swapped titles, MRR rose by 0.03 for arctic-m and by 0.014 for the hybrid.
 - Realistic queries did not change.
 - Expanding documents as well added little, and `clean` alone did not help.
@@ -91,11 +91,11 @@ let tok = Tokenizer::new(Config::default());
 let doc = tok.embed_document("Grover's algorithm on a surface code"); // SparseVector { indices, values }
 let query = tok.embed_query("surface code threshold");
 
-let custom = Tokenizer::new(Config {
-    domains: vec![Domain::builtin("quant-ph")?, Domain::load("domains/cond-mat.str-el")?],
-    input: Input::Latex,
-    weighting: Weighting::Bm25 { k1: 1.2, b: 0.75, avg_len: None },
-});
+let mut config = Config::default();
+config.domains = vec![Domain::builtin("quant-ph")?, Domain::load("domains/cond-mat.str-el")?];
+config.input = Input::Latex;
+config.weighting = Weighting::Bm25 { k1: 1.2, b: 0.75, avg_len: None };
+let custom = Tokenizer::new(config);
 ```
 
 `cargo run --example tokenize -- "some text"` prints the terms for each argument.
@@ -140,7 +140,8 @@ Directories under `crates/scitok/data/domains/` are compiled into the library be
 
 > **Changing domain data changes term ids.** Any change to a lexicon, stopwords or tokenizer
 > version changes the terms a document is indexed under. Re-index the collection afterwards.
-> Domain files carry a format `version`, and mismatches are rejected.
+> Domain files carry a format `version`, and mismatches are rejected. Releases that change the
+> terms bump the minor version (`0.1.x` → `0.2.0`); patch releases keep them.
 
 ## Learning a domain: `scitok-learn`
 
@@ -217,7 +218,7 @@ mined terms. `refine` with `gpt-6.1-sol` then reviewed the mined terms:
 
 ## Evaluation
 
-The full evaluation is in [eval/RESULTS.md](eval/RESULTS.md). It was run on 9,264 recent quant-ph
+The full evaluation is in [eval/RESULTS.md](https://github.com/aqora-io/scitok/blob/main/eval/RESULTS.md). It was run on 9,264 recent quant-ph
 papers against 13 retrievers, with relevance judged blind, and tuned on dev splits only. On the
 test splits:
 - **Realistic topical queries:** scitok ties the best BM25 implementations and learned sparse
