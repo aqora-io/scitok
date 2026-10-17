@@ -4,6 +4,7 @@ description = "Harvest arXiv and learn scitok domain data"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
 scitok = { path = "../scitok", default-features = false }
